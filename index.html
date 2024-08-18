@@ -1,0 +1,4341 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cluster Cartography</title>
+    <style>
+      :root {
+        --primary-color: #3f4b59;
+        --secondary-color: #5e92bf;
+        --accent-color: #d9c5b4;
+        --background-color: #f4f4f4;
+        --border-color: #a4a4a4;
+        --text-color: #333;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        margin: 0;
+        height: 100vh;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+        color: var(--text-color);
+        background-color: var(--background-color);
+      }
+
+      header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background-color: var(--primary-color);
+        z-index: 1000;
+        display: flex;
+        padding: 10px;
+        border-bottom: 1px solid var(--border-color);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        flex-direction: row;
+
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 10px;
+      }
+
+      .header-content {
+        display: flex;
+        gap: 10px;
+        font-size: 14px;
+      }
+
+      .header-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: space-evenly;
+      }
+
+      .hamburger {
+        display: none;
+        flex-direction: column;
+        justify-content: space-around;
+        width: 25px;
+        height: 25px;
+        cursor: pointer;
+      }
+
+      .hamburger div {
+        width: 25px;
+        height: 3px;
+        background-color: white;
+      }
+
+      header button,
+      header input {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      header button {
+        background-color: var(--secondary-color);
+        color: white;
+      }
+
+      header button:hover {
+        background-color: var(--accent-color);
+        color: black;
+      }
+
+      header input[type="file"] {
+        background-color: white;
+        color: var(--primary-color);
+      }
+
+      main {
+        display: flex;
+        flex-grow: 1;
+        margin-top: 60px; /* Adjust based on header height */
+        overflow: hidden;
+      }
+
+      aside {
+        flex-basis: 30%;
+        max-width: 30%;
+        overflow-y: auto;
+        border-right: 1px solid var(--border-color);
+        background-color: white;
+      }
+
+      nav {
+        flex-basis: 25%;
+        display: flex;
+
+        overflow-y: auto;
+        border-left: 1px solid var(--border-color);
+        background-color: var(--background-color);
+        flex-direction: column;
+      }
+
+      content {
+        overflow-y: auto;
+        flex-grow: 1;
+        padding: 10px;
+      }
+
+      #editableTable {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      #editableTable th,
+      #editableTable td {
+        border: 1px solid var(--border-color);
+        padding: 8px;
+        text-align: center;
+      }
+
+      #editableTable th {
+        background-color: var(--primary-color);
+        color: white;
+      }
+
+      #editableTable td.number-cell {
+        background-color: #d3d3d3;
+      }
+
+      #mySVG,
+      #histogramSVG {
+        border: 1px solid var(--border-color);
+        margin: 10px 0;
+        height: auto;
+      }
+
+      .highlight {
+        background-color: #d9c5b4;
+      }
+
+      .tooltip {
+        position: absolute;
+        background-color: white;
+        border: 1px solid black;
+        padding: 5px;
+        display: none;
+        pointer-events: none;
+        z-index: 10;
+        margin: 15px;
+      }
+
+      .highlight-ellipse {
+        fill: green;
+        stroke-width: 1 !important;
+      }
+
+      ellipse:hover {
+        stroke-width: 2;
+        stroke: red;
+        cursor: pointer;
+      }
+
+      /* Styles for navigation tabs */
+      nav .tabs {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        align-items: center;
+        gap: 4px;
+        background: #3f4b59;
+      }
+
+      nav .tab-link {
+        padding: 12px 10px;
+        cursor: pointer;
+        color: white;
+        text-align: center;
+        background: var(--secondary-color);
+        border: none;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      nav .tab-link:hover {
+        background-color: var(--accent-color);
+        color: black;
+      }
+
+      nav .tab-link.active {
+        background-color: #b2a193;
+        color: black;
+      }
+
+      /* Styles for tab content */
+      .tab-content,
+      .shared-content {
+        display: none;
+        padding: 0 20px;
+        background-color: white;
+        border: 1px solid var(--border-color);
+        border-top: none;
+        margin-top: -1px;
+      }
+      .tab-content {
+        padding-bottom: 20px;
+      }
+      .tab-content.active {
+        display: block;
+      }
+
+      #tab-1 label {
+        display: block;
+      }
+
+      .tab-content button {
+        height: calc(2.25rem + 2px);
+        margin: 0.25rem 0;
+        padding: 0.375rem 0.75rem;
+        width: 100%;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      .buttonFindHighestDensity {
+        width: 60% !important;
+      }
+      .ring {
+        fill: none;
+        stroke: blue;
+        stroke-width: 1;
+      }
+      .overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 500; /* Ensure it appears above main content but below the header */
+        display: none;
+      }
+
+      .show-overlay .overlay {
+        display: block;
+      }
+      #progressContainer {
+        top: 60px; /* Adjust based on header height */
+        width: 100%;
+
+        z-index: 1000;
+
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        align-items: baseline;
+        align-content: center;
+        justify-content: flex-start;
+      }
+      #progressPercentage {
+        display: none;
+      }
+      #resultsPA,
+      #results,
+      #resultsCIO,
+      #stripResults,
+      #centralStripResults,
+      #centralStripResults2,
+      #resultsBinggeli {
+        border-top: 1px solid #333;
+        margin-top: 20px;
+      }
+      th {
+        cursor: pointer;
+      }
+      .sort-indicator {
+        font-size: 14px;
+
+        margin: 0 8px;
+
+        position: absolute;
+        scale: 1.6;
+        font-family: unset;
+      }
+      /* Спочатку приховуємо спільний div */
+      .shared-content {
+        display: none;
+        padding-top: 25px;
+      }
+
+      /* Відображаємо спільний div для вкладок tab-1, tab-2, tab-3 */
+      .show-shared-content .shared-content {
+        display: block;
+      }
+
+      .text-field {
+        margin-bottom: 1rem;
+      }
+
+      .text-field__label {
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+
+      .text-field__input {
+        display: block;
+        width: 100%;
+        height: calc(2.25rem + 2px);
+        padding: 0.375rem 0.75rem;
+        font-family: inherit;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        background-clip: padding-box;
+        border: 1px solid #bdbdbd;
+        border-radius: 0.25rem;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+      }
+
+      .text-field__input::placeholder {
+        color: #212529;
+        opacity: 0.4;
+      }
+
+      .text-field__input:focus {
+        color: #212529;
+        background-color: #fff;
+        border-color: #bdbdbd;
+        outline: 0;
+        box-shadow: 0 0 0 0.2rem rgba(158, 158, 158, 0.25);
+      }
+
+      .text-field__input:disabled,
+      .text-field__input[readonly] {
+        background-color: #f5f5f5;
+        opacity: 1;
+      }
+
+      @media (max-width: 800px) {
+        header {
+          flex-wrap: wrap;
+          height: auto;
+          padding: 10px;
+        }
+
+        .header-content {
+          display: none;
+          flex-direction: row;
+        }
+
+        .hamburger {
+          display: flex;
+          margin: 10px;
+        }
+
+        .header-buttons {
+          flex-direction: column;
+          align-items: stretch;
+          display: none;
+        }
+        .show-content .header-buttons {
+          display: flex;
+          width: inherit;
+          margin-top: 15px;
+        }
+        .show-content .header-content,
+        .show-content nav ul.tabs {
+          display: flex;
+
+          gap: 10px;
+          width: 100%;
+          align-items: stretch;
+        }
+
+        main {
+          flex-direction: column;
+          overflow: auto;
+        }
+
+        nav,
+        content,
+        aside {
+          flex-basis: 100%;
+          max-width: 100%;
+          order: initial;
+          flex-grow: 0;
+          overflow: visible;
+        }
+
+        nav {
+          order: 1;
+          margin-top: 10px;
+        }
+
+        content {
+          order: 2;
+        }
+
+        aside {
+          order: 3;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="hamburger" onclick="toggleHeaderContent()">
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="header-content">
+        <input type="file" id="fileInput" accept=".txt" />
+        <button onclick="handleFile()">Load Data</button>
+      </div>
+      <div class="header-buttons">
+        <button onclick="drawEllipses()">CreateMap</button>
+        <button onclick="saveBMP()">Save Map</button>
+        <button onclick="histogramSVGsaveBMP()">Save D.H.</button>
+      </div>
+    </header>
+
+    <main>
+      <aside>
+        <table id="editableTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable(0)">
+                № <span class="sort-indicator"></span>
+              </th>
+              <th onclick="sortTable(1)">
+                X <span class="sort-indicator"></span>
+              </th>
+              <th onclick="sortTable(2)">
+                Y <span class="sort-indicator"></span>
+              </th>
+              <th onclick="sortTable(3)">
+                m' <span class="sort-indicator"></span>
+              </th>
+              <th onclick="sortTable(4)">
+                E <span class="sort-indicator"></span>
+              </th>
+              <th onclick="sortTable(5)">
+                PA <span class="sort-indicator"></span>
+              </th>
+              <th onclick="sortTable(6)">
+                BG <span class="sort-indicator"></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Table content will be generated here using JavaScript -->
+          </tbody>
+        </table>
+      </aside>
+
+      <content>
+        <svg
+          id="mySVG"
+          viewBox="0 0 575 545"
+          preserveAspectRatio="xMidYMid meet"
+        ></svg>
+        <svg
+          id="histogramSVG"
+          viewBox="0 0 575 545"
+          preserveAspectRatio="xMidYMid meet"
+        ></svg>
+      </content>
+      <nav class="show-shared-content">
+        <ul class="tabs">
+          <li
+            class="tab-link active"
+            data-tab="tab-1"
+            onclick="analyzeConcentration()"
+          >
+            C&#8288;-&#8288;I&#8288;-&#8288;O
+          </li>
+          <li class="tab-link" data-tab="tab-2" onclick="analyzeByStrips()">
+            Line
+          </li>
+          <li class="tab-link" data-tab="tab-3" onclick="analyzeCentralStrip()">
+            LHB
+          </li>
+          <li
+            class="tab-link"
+            data-tab="tab-4"
+            onclick="drawHistogramEllipticities(getDataFromTable(), 10)"
+          >
+            E
+          </li>
+          <li
+            class="tab-link"
+            data-tab="tab-5"
+            onclick="findNearbyGalaxiesWithSimilarOrientation(getDataFromTable())"
+          >
+            Analysis of directionality
+          </li>
+          <li
+            class="tab-link"
+            data-tab="tab-6"
+            onclick="analyzeBinggeliEffect(getDataFromTable())"
+          >
+            Binggeli Effect
+          </li>
+        </ul>
+        <div class="shared-content">
+          <div class="text-field">
+            <label for="Radius" class="text-field__label"
+              >Cluster Radius:</label
+            >
+            <input
+              type="number"
+              id="Radius"
+              class="text-field__input"
+              value="1000"
+            />
+          </div>
+          <div class="text-field">
+            <label for="centerX" class="text-field__label"
+              >Center X Coordinate:</label
+            >
+            <input
+              type="number"
+              id="centerX"
+              class="text-field__input"
+              value="0"
+            />
+          </div>
+          <div class="text-field">
+            <label for="centerY" class="text-field__label"
+              >Center Y Coordinate:</label
+            >
+            <input
+              type="number"
+              id="centerY"
+              class="text-field__input"
+              value="0"
+            />
+          </div>
+        </div>
+
+        <div id="tab-1" class="tab-content active">
+          <div class="text-field">
+            <label for="ringWith" class="text-field__label">Width:</label>
+            <input
+              type="number"
+              id="ringWith"
+              class="text-field__input"
+              value="0.15"
+              step="0.05"
+            />
+          </div>
+          <div class="text-field">
+            <label for="numRings" class="text-field__label"
+              >Number of Rings:</label
+            >
+            <input
+              type="number"
+              id="numRings"
+              class="text-field__input"
+              value="5"
+              disabled
+            />
+          </div>
+          <div class="text-field">
+            <label for="ringDistance" class="text-field__label"
+              >Distance Between Rings:</label
+            >
+            <input
+              type="number"
+              id="ringDistance"
+              class="text-field__input"
+              value="250"
+              disabled
+            />
+          </div>
+          <label for="showRings">Show galaxies in calculations:</label>
+          <input
+            type="checkbox"
+            id="showRings"
+            checked
+            onchange="toggleRings()"
+          />
+          <br />
+          <label for="densityCalculation1">
+            <input
+              type="radio"
+              id="densityCalculation1"
+              name="densityCalculation"
+              value="method1"
+              checked
+            />
+            Consider area fraction
+          </label>
+          <label for="densityCalculation2">
+            <input
+              type="radio"
+              id="densityCalculation2"
+              name="densityCalculation"
+              value="method2"
+            />
+            Ignore area fraction
+          </label>
+          <br />
+          <br />
+          <button onclick="analyzeConcentration()">
+            Analyze Concentration
+          </button>
+          <div id="progressContainer">
+            <button
+              class="buttonFindHighestDensity"
+              onclick='findHighestDensityCenter(
+                    250 + 65,
+                    250 + 10,
+                    parseFloat(document.getElementById("ringDistance").value) / 8,
+                    document.getElementById("Radius").value,
+                    getDataFromTable()
+                )'
+            >
+              Automatic Search
+            </button>
+            <span id="progressPercentage">0%</span>
+            <span id="resultFindHighestDensityCenter"></span>
+          </div>
+          <div id="resultsCIO"></div>
+          <div id="results"></div>
+        </div>
+
+        <div id="tab-2" class="tab-content">
+          <div class="text-field">
+            <label for="numStrips" class="text-field__label"
+              >Number of Strips:</label
+            >
+            <input
+              type="number"
+              id="numStrips"
+              class="text-field__input"
+              value="7"
+              step="2"
+            />
+          </div>
+
+          <div class="text-field">
+            <label for="excludeCenter" class="text-field__label"
+              >Exclude Center:</label
+            >
+            <input type="checkbox" id="excludeCenter" />
+          </div>
+          <div class="text-field">
+            <label for="rotationAngle" class="text-field__label"
+              >Rotation Angle:</label
+            >
+            <input
+              type="number"
+              id="rotationAngle"
+              class="text-field__input"
+              value="0"
+            />
+          </div>
+          <div class="text-field">
+            <label for="showLine" class="text-field__label"
+              >Show Axis Line:</label
+            >
+            <input type="checkbox" id="showLine" />
+          </div>
+          <button onclick="analyzeByStrips()">Analyze Strips</button>
+          <br />
+          <button onclick="findMaxEntriesAngle()">
+            Find the direction of the densest strip
+          </button>
+          <br />
+          <div id="maxResults"></div>
+          <div id="stripResults"></div>
+        </div>
+
+        <div id="tab-3" class="tab-content">
+          <label for="numCentralStrips">Beam Width:</label>
+          <input
+            type="number"
+            id="numCentralStrips"
+            value="7"
+            class="text-field__input"
+            step="2"
+          />
+          <br />
+          <div class="text-field">
+            <label for="excludeStripCenter" class="text-field__label"
+              >Exclude Center:</label
+            >
+            <input type="checkbox" id="excludeStripCenter" />
+          </div>
+
+          <button onclick="analyzeCentralStrip()">
+            Lighthouse beam analysis (y>0)
+          </button>
+          <div id="centralStripResults2"></div>
+          <div id="centralStripResults"></div>
+        </div>
+
+        <div id="tab-4" class="tab-content">
+          <div class="text-field"></div>
+
+          <button onclick="drawHistogramEllipticities(getDataFromTable(), 10)">
+            Analyze E
+          </button>
+        </div>
+
+        <div id="tab-5" class="tab-content">
+          <br />
+          <div class="text-field">
+            <label for="AngelDifference" class="text-field__label"
+              >Angle Difference:</label
+            >
+            <input
+              type="number"
+              id="AngelDifference"
+              class="text-field__input"
+              value="15"
+            />
+          </div>
+          <div class="text-field">
+            <label for="ResizeM" class="text-field__label">Resize m':</label>
+            <input
+              type="number"
+              id="ResizeM"
+              class="text-field__input"
+              value="0"
+            />
+          </div>
+          <label for="directionLine">Show the direction line:</label>
+          <input type="checkbox" id="directionLine" checked />
+          <br />
+          <label for="distantLine"
+            >Show the line to the 1st minimally distant galaxy:</label
+          >
+          <input type="checkbox" id="distantLine" checked />
+          <br />
+          <br />
+          <div class="text-field">
+            <label for="eLimit" class="text-field__label"
+              >E Limit (greater than):</label
+            >
+            <input
+              type="number"
+              id="eLimit"
+              class="text-field__input"
+              value="0.2"
+              step="0.01"
+            />
+          </div>
+          <div class="text-field">
+            <label for="mLimit" class="text-field__label"
+              >m' Limit (greater than):</label
+            >
+            <input
+              type="number"
+              id="mLimit"
+              class="text-field__input"
+              value="3"
+              step="0.1"
+            />
+          </div>
+          <label for="ShowAllGalaxies"
+            >Show all galaxies inside the filter:</label
+          >
+          <input type="checkbox" id="ShowAllGalaxies" checked />
+          <br />
+          <label for="showOutOfFilterGalaxies"
+            >Show all galaxies outside the filter:</label
+          >
+          <input type="checkbox" id="showOutOfFilterGalaxies" checked />
+          <br />
+          <br />
+          <button
+            onclick="findNearbyGalaxiesWithSimilarOrientation(getDataFromTable())"
+          >
+            Analyze PA
+          </button>
+
+          <div id="resultsPA"></div>
+        </div>
+
+        <div id="tab-6" class="tab-content">
+          <br />
+
+          <div class="text-field">
+            <label for="AngleTolerance" class="text-field__label"
+              >Angle Tolerance:</label
+            >
+
+            <input
+              type="number"
+              id="AngleTolerance"
+              class="text-field__input"
+              value="180"
+              step="1"
+            />
+            </div>
+             <div class="text-field">
+            <label for="BinggeliResizeM" class="text-field__label"
+              >Resize m':</label
+            >
+            <input
+              type="number"
+              id="BinggeliResizeM"
+              class="text-field__input"
+              value="0"
+            />
+            </div>
+             <div class="text-field">
+            <label for="BinggelieLimit" class="text-field__label"
+              >E Limit (greater than):</label
+            >
+            <input
+              type="number"
+              id="BinggelieLimit"
+              class="text-field__input"
+              value="0.2"
+              step="0.01"
+            />
+            </div>
+             <div class="text-field">
+            <label for="BinggelimLimit" class="text-field__label"
+              >m' Limit (greater than):</label
+            >
+            <input
+              type="number"
+              id="BinggelimLimit"
+              class="text-field__input"
+              value="3"
+              step="0.1"
+            />
+</div>
+
+             <div class="text-field">
+            <label for="BinggeCountBins" class="text-field__label"
+              >Bingge Count Bins:</label
+            >
+            <input
+              type="number"
+              id="BinggeCountBins"
+              class="text-field__input"
+              value="10"
+              step="1"
+            />
+</div>
+
+ <div class="text-field">
+            <label for="BinggeShowAllGalaxies"
+              >Show all galaxies inside the filter:</label
+            >
+            <input type="checkbox" id="BinggeShowAllGalaxies" checked />
+            
+
+
+            <label for="BinggelishowOutOfFilterGalaxies"
+              >Show all galaxies outside the filter:</label
+            >
+            <input
+              type="checkbox"
+              id="BinggelishowOutOfFilterGalaxies"
+              checked
+            />
+            </div>
+
+          
+          <button onclick="analyzeBinggeliEffect(getDataFromTable())">
+            Analyze Binggeli Effect
+          </button>
+          
+          <div id="resultsBinggeli"></div>
+          </div>
+        </div>
+      </nav>
+      <div class="overlay" onclick="toggleHeaderContent()"></div>
+    </main>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+      function toggleHeaderContent() {
+        document.querySelector("header").classList.toggle("show-content");
+        document.querySelector("main").classList.toggle("show-overlay");
+      }
+
+      function toggleTabs() {
+        document.querySelector("nav").classList.toggle("show-content");
+      }
+
+      document.querySelectorAll(".tab-link").forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          var tabID = this.getAttribute("data-tab");
+
+          document.querySelectorAll(".tab-link").forEach(function (link) {
+            link.classList.remove("active");
+          });
+
+          document.querySelectorAll(".tab-content").forEach(function (content) {
+            content.classList.remove("active");
+          });
+
+          this.classList.add("active");
+          document.getElementById(tabID).classList.add("active");
+
+          // Перевіряємо, чи активна вкладка є однією з tab-1, tab-2, tab-3
+          if (tabID === "tab-1" || tabID === "tab-2" || tabID === "tab-3") {
+            document.querySelector("nav").classList.add("show-shared-content");
+          } else {
+            document
+              .querySelector("nav")
+              .classList.remove("show-shared-content");
+          }
+        });
+      });
+      // ----------------
+      function sortTable(columnIndex) {
+        var table = document.getElementById("editableTable");
+        var rows = table.rows;
+        var switching = true;
+        var shouldSwitch;
+        var i;
+        var x, y;
+        var direction = "ascending";
+        var switchCount = 0;
+
+        // Remove existing sort indicators
+        var indicators = table.querySelectorAll(".sort-indicator");
+        indicators.forEach(function (indicator) {
+          indicator.textContent = "";
+        });
+
+        while (switching) {
+          switching = false;
+          var rowsArray = Array.from(rows).slice(1);
+
+          for (i = 0; i < rowsArray.length - 1; i++) {
+            shouldSwitch = false;
+            x = rowsArray[i].getElementsByTagName("TD")[columnIndex];
+            y = rowsArray[i + 1].getElementsByTagName("TD")[columnIndex];
+
+            if (direction == "ascending") {
+              if (
+                parseFloat(x.innerHTML.replace(",", ".")) >
+                parseFloat(y.innerHTML.replace(",", "."))
+              ) {
+                shouldSwitch = true;
+                break;
+              }
+            } else if (direction == "descending") {
+              if (
+                parseFloat(x.innerHTML.replace(",", ".")) <
+                parseFloat(y.innerHTML.replace(",", "."))
+              ) {
+                shouldSwitch = true;
+                break;
+              }
+            }
+          }
+
+          if (shouldSwitch) {
+            rowsArray[i].parentNode.insertBefore(
+              rowsArray[i + 1],
+              rowsArray[i]
+            );
+            switching = true;
+            switchCount++;
+          } else {
+            if (switchCount == 0 && direction == "ascending") {
+              direction = "descending";
+              switching = true;
+            }
+          }
+        }
+
+        // Add sort indicator
+        var header = table.getElementsByTagName("TH")[columnIndex];
+        var indicator = header.querySelector(".sort-indicator");
+        if (direction == "ascending") {
+          indicator.textContent = "↑";
+        } else {
+          indicator.textContent = "↓";
+        }
+        drawEllipses();
+      }
+
+      function analyzeCentralStrip() {
+        const radius = parseFloat(document.getElementById("Radius").value) / 8;
+        const centerX =
+          parseFloat(document.getElementById("centerX").value) / 8 + 250 + 65;
+        const centerY =
+          parseFloat(document.getElementById("centerY").value) / -8 + 250 + 10;
+        const numCentralStrips = parseFloat(
+          document.getElementById("numCentralStrips").value
+        );
+        const excludeCenter =
+          document.getElementById("excludeStripCenter").checked;
+        //const showLine = document.getElementById("showStripLine").checked;
+        const stripWidth = (2 * radius) / numCentralStrips;
+
+        const svg = document.getElementById("mySVG");
+        svg.innerHTML = "";
+        drawLinesAndText();
+
+        const stripResults = document.getElementById("centralStripResults");
+        stripResults.innerHTML = "";
+        const stripResults2 = document.getElementById("centralStripResults2");
+        stripResults2.innerHTML = "";
+
+        // Draw main circle
+        const circle = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "circle"
+        );
+        circle.setAttribute("cx", centerX);
+        circle.setAttribute("cy", centerY);
+        circle.setAttribute("r", radius);
+        circle.setAttribute("stroke", "rgba(0,0,0, 0.1)");
+        circle.setAttribute("stroke-width", "1");
+        circle.setAttribute("fill", "none");
+        svg.appendChild(circle);
+
+        // Draw central strip
+        const centralStripY = centerY - radius;
+        const rect = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "rect"
+        );
+        rect.setAttribute("x", centerX - stripWidth / 2);
+        rect.setAttribute("y", centralStripY);
+        rect.setAttribute("width", stripWidth);
+        rect.setAttribute("height", radius);
+        rect.setAttribute("stroke", "rgba(0,0,0, 0.1)");
+        rect.setAttribute("fill", `none`);
+        svg.appendChild(rect);
+
+        // Draw inner dashed circle if excludeCenter is checked
+        if (excludeCenter) {
+          const innerCircle = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle"
+          );
+          innerCircle.setAttribute("cx", centerX);
+          innerCircle.setAttribute("cy", centerY);
+          innerCircle.setAttribute("r", stripWidth / 2);
+          innerCircle.setAttribute("stroke", "rgba(0,0,0, 0.1)");
+          innerCircle.setAttribute("stroke-width", "1");
+          innerCircle.setAttribute("fill", "none");
+          innerCircle.setAttribute("stroke-dasharray", "2, 2");
+          svg.appendChild(innerCircle);
+        }
+
+        // Analyze data points
+        const data = getDataFromTable(); // Assuming you have a function to get data points
+        const totalGalaxies = data.length;
+        const angleCounts = Array(380).fill(0);
+        var stringResult = "";
+        for (let angle = 0; angle < 380; angle++) {
+          let pointCount = 0;
+          data.forEach((point, index) => {
+            const rotatedPoint = rotatePoint(
+              point.i,
+              point.x,
+              point.y,
+              centerX,
+              centerY,
+              angle
+            );
+            const distToCenter = Math.sqrt(
+              (rotatedPoint.x - centerX) ** 2 + (rotatedPoint.y - centerY) ** 2
+            );
+            const isInsideCenter =
+              excludeCenter && distToCenter < stripWidth / 2;
+            const isInCentralStrip =
+              rotatedPoint.y < centerY &&
+              Math.abs(rotatedPoint.x - centerX) <= stripWidth / 2;
+            const isInOuterCircle = distToCenter <= radius;
+
+            if (isInCentralStrip && isInOuterCircle && !isInsideCenter) {
+              pointCount++;
+            }
+
+            if (angle === 0) {
+              const color =
+                isInCentralStrip && isInOuterCircle && !isInsideCenter
+                  ? "blue"
+                  : "red";
+              const fillColor =
+                isInCentralStrip && isInOuterCircle && !isInsideCenter
+                  ? "lightblue"
+                  : "lightcoral";
+
+              const ellipse = createCircleViewe(
+                rotatedPoint.i,
+                rotatedPoint.x,
+                rotatedPoint.y,
+                3,
+                0,
+                point.PA,
+                color,
+                fillColor,
+                point.BG
+              );
+              svg.appendChild(ellipse);
+            }
+          });
+          angleCounts[angle] = pointCount;
+
+          // Display results
+          stringResult += `<br><div><b>α:</b>&emsp;&emsp;${angle}&emsp;&emsp;<b>Count:</b>&emsp;&emsp;${pointCount}&emsp;&emsp;<b>f':</b>&emsp;&emsp;${(
+            pointCount / totalGalaxies
+          ).toFixed(4)}</div>`;
+        }
+        stripResults.innerHTML = stringResult;
+
+
+        //console.log(totalPoints, totalGalaxies);
+       // const densities = angleCounts.map((count) => count / totalGalaxies);
+        // Calculate standard deviation
+        const meanCount =
+          angleCounts.reduce((sum, count) => sum + count/totalGalaxies, 0) /
+          angleCounts.length;
+        const variance =
+          angleCounts.reduce(
+            (sum, count) => sum + (count/totalGalaxies - meanCount) ** 2,
+            0
+          ) /
+          (angleCounts.length - 1);
+        const standardDeviation = Math.sqrt(variance);
+        //console.log(meanCount, variance, standardDeviation);
+
+        // Display standard deviation
+        stripResults2.innerHTML += `<br>
+              <b>The mean value: </b>&emsp;${meanCount.toFixed(4)}<br>
+              <b>Variance:</b>&emsp;${variance.toFixed(4)}<br>
+      <b>Standard Deviation (S):</b>&emsp;${standardDeviation.toFixed(4)}`;
+
+        drawAngleHistogram(angleCounts, 380);
+      }
+
+      function drawAngleHistogram(angleCounts, numBins) {
+        const svg = document.getElementById("histogramSVG");
+        svg.innerHTML = "";
+
+        const width = 575;
+        const height = 545;
+        const margin = 55;
+
+        // Calculate densities
+        //const totalPoints = angleCounts.reduce((sum, count) => sum + count, 0);
+        const data = getDataFromTable(); // Assuming you have a function to get data points
+        const totalGalaxies = data.length;
+        //console.log(totalPoints, totalGalaxies);
+        const densities = angleCounts.map((count) => count / totalGalaxies);
+
+        // Normalize bin values
+        const maxDensity = 0.4; //Math.max(...densities);
+        const barWidth = (width - margin * 2) / numBins;
+
+        // Create X and Y axes
+        const xAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        xAxis.setAttribute("x1", margin);
+        xAxis.setAttribute("y1", height - margin);
+        xAxis.setAttribute("x2", width - margin);
+        xAxis.setAttribute("y2", height - margin);
+        xAxis.setAttribute("stroke-width", "2");
+        xAxis.setAttribute("stroke", "black");
+        svg.appendChild(xAxis);
+
+        const yAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        yAxis.setAttribute("x1", margin);
+        yAxis.setAttribute("y1", margin);
+        yAxis.setAttribute("x2", margin);
+        yAxis.setAttribute("y2", height - margin);
+        yAxis.setAttribute("stroke-width", "2");
+        yAxis.setAttribute("stroke", "black");
+        svg.appendChild(yAxis);
+
+        const numBinsLabel = 8;
+        // Create X axis labels and ticks
+        for (let i = 0; i <= numBins; i += 45) {
+          const x = margin + i * barWidth;
+
+          // Labels
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", x);
+          text.setAttribute("y", height - margin + 25);
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          text.textContent = i.toFixed(1); //* 2) / numBinsLabel - 1).toFixed(2);
+          svg.appendChild(text);
+
+          // Ticks
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", x);
+          tick.setAttribute("y1", height - margin);
+          tick.setAttribute("x2", x);
+          tick.setAttribute("y2", height - margin + 5);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+        }
+
+        // Create Y axis labels, ticks, and grid lines
+        const yAxisSteps = 10;
+        for (let i = 0; i <= yAxisSteps; i++) {
+          const y = height - margin - ((height - margin * 2) / yAxisSteps) * i;
+          const densityValue = ((maxDensity * i) / yAxisSteps).toFixed(2);
+
+          // Labels
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", margin - 10);
+          text.setAttribute("y", y + 3);
+          text.setAttribute("text-anchor", "end");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          if (i % 2 == 0)
+            text.textContent = i === yAxisSteps ? "" : densityValue; // Hide the text for the last value
+          svg.appendChild(text);
+
+          // Ticks
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", margin - 5);
+          tick.setAttribute("y1", y);
+          tick.setAttribute("x2", margin);
+          tick.setAttribute("y2", y);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+
+          // Grid lines
+          const gridLine = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          gridLine.setAttribute("x1", margin);
+          gridLine.setAttribute("y1", y);
+          gridLine.setAttribute("x2", width - margin);
+          gridLine.setAttribute("y2", y);
+          gridLine.setAttribute("stroke", "lightgray");
+          gridLine.setAttribute("stroke-dasharray", "2,2");
+          svg.appendChild(gridLine);
+        }
+
+        // Create bars with borders
+        densities.forEach((density, index) => {
+          const barHeight = (density / maxDensity) * (height - margin * 2);
+          const rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          rect.setAttribute("x", margin + index * barWidth);
+          rect.setAttribute("y", height - margin - barHeight);
+          rect.setAttribute("width", barWidth);
+          rect.setAttribute("height", barHeight);
+          rect.setAttribute("fill", "gray");
+          rect.setAttribute("stroke", "black");
+          rect.setAttribute("stroke-width", "0.3");
+
+          // Tooltip (title attribute)
+          rect.setAttribute("title", `α: ${index}. f': ${density.toFixed(4)}`);
+
+          // Mouseover event listener for tooltip
+          rect.addEventListener("mouseover", (event) => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.textContent = `α: ${index}. f': ${density.toFixed(4)}`;
+            tooltip.style.display = "block";
+            tooltip.style.top = `${event.clientY}px`;
+            tooltip.style.left = `${event.clientX}px`;
+            rect.setAttribute("fill", "rgb(211, 211, 211)");
+          });
+
+          // Mouseout event listener to hide tooltip
+          rect.addEventListener("mouseout", () => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+            rect.setAttribute("fill", "gray");
+          });
+
+          svg.appendChild(rect);
+        });
+
+        // Tooltip element
+        const tooltip = document.createElement("div");
+        tooltip.setAttribute("id", "tooltip");
+        tooltip.style.position = "absolute";
+        tooltip.style.display = "none";
+        tooltip.style.background = "rgba(0, 0, 0, 0.7)";
+        tooltip.style.color = "#fff";
+        tooltip.style.padding = "5px";
+        document.body.appendChild(tooltip);
+
+        // Add axis labels
+        const xAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        xAxisLabel.setAttribute("x", width / 2 - margin / 2 + 15);
+        xAxisLabel.setAttribute("y", height - margin / 2 + 20);
+        xAxisLabel.setAttribute("text-anchor", "center");
+        xAxisLabel.setAttribute("font-size", "22");
+        xAxisLabel.setAttribute("font-family", "Arial");
+        xAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        xAxisLabel.textContent = "α";
+        svg.appendChild(xAxisLabel);
+
+        const yAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        yAxisLabel.setAttribute("x", margin - 25);
+        yAxisLabel.setAttribute("y", margin + 30);
+        yAxisLabel.setAttribute("text-anchor", "middle");
+        yAxisLabel.setAttribute("font-size", "22");
+        yAxisLabel.setAttribute("font-family", "Arial");
+        yAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        yAxisLabel.textContent = "f'";
+        svg.appendChild(yAxisLabel);
+      }
+
+      function drawDensityHistogram(data, numBins) {
+        const svg = document.getElementById("histogramSVG");
+        svg.innerHTML = "";
+
+        const width = 575;
+        const height = 545;
+        const margin = 55;
+
+        // Extract counts and ringFractions
+        const counts = data.map((d) => d.count);
+        const ringFractions = data.map((d) => d.ringFraction);
+
+        // Calculate densities
+        const totalGalaxies = counts.reduce((sum, count) => sum + count, 0);
+        const densities = counts.map(
+          (count, index) => count / totalGalaxies / ringFractions[index]
+        );
+
+        // Normalize bin values
+        const maxDensity = 0.5; //Math.max(...densities);
+        const barWidth = (width - margin * 2) / numBins;
+        const barWidthLabel = (width - margin * 2) / 20;
+        // Create X and Y axes
+        const xAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        xAxis.setAttribute("x1", margin);
+        xAxis.setAttribute("y1", height - margin);
+        xAxis.setAttribute("x2", width - margin);
+        xAxis.setAttribute("y2", height - margin);
+        xAxis.setAttribute("stroke-width", "2");
+        xAxis.setAttribute("stroke", "black");
+        svg.appendChild(xAxis);
+
+        const yAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        yAxis.setAttribute("x1", margin);
+        yAxis.setAttribute("y1", margin);
+        yAxis.setAttribute("x2", margin);
+        yAxis.setAttribute("y2", height - margin);
+        yAxis.setAttribute("stroke-width", "2");
+        yAxis.setAttribute("stroke", "black");
+        svg.appendChild(yAxis);
+
+        // Create X axis labels and ticks
+        for (let i = 0; i <= 20; i++) {
+          const x = margin + i * barWidthLabel;
+
+          // Labels
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", x);
+          text.setAttribute("y", height - margin + 25);
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          if (i % 2 == 0) text.textContent = ((i * 2) / 20 - 1).toFixed(1);
+          svg.appendChild(text);
+
+          // Ticks
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", x);
+          tick.setAttribute("y1", height - margin);
+          tick.setAttribute("x2", x);
+          tick.setAttribute("y2", height - margin + 5);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+        }
+
+        // Create Y axis labels, ticks, and grid lines
+        const yAxisSteps = 5;
+        for (let i = 0; i <= yAxisSteps; i++) {
+          const y = height - margin - ((height - margin * 2) / yAxisSteps) * i;
+          const densityValue = ((maxDensity * i) / yAxisSteps).toFixed(2);
+
+          // Labels
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", margin - 10);
+          text.setAttribute("y", y + 3);
+          text.setAttribute("text-anchor", "end");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          text.textContent = i === yAxisSteps ? "" : densityValue; // Hide the text for the last value
+          svg.appendChild(text);
+
+          // Ticks
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", margin - 5);
+          tick.setAttribute("y1", y);
+          tick.setAttribute("x2", margin);
+          tick.setAttribute("y2", y);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+
+          // Grid lines
+          const gridLine = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          gridLine.setAttribute("x1", margin);
+          gridLine.setAttribute("y1", y);
+          gridLine.setAttribute("x2", width - margin);
+          gridLine.setAttribute("y2", y);
+          gridLine.setAttribute("stroke", "lightgray");
+          gridLine.setAttribute("stroke-dasharray", "2,2");
+          svg.appendChild(gridLine);
+        }
+
+        // Create bars with borders
+        densities.forEach((density, index) => {
+          const barHeight = (density / maxDensity) * (height - margin * 2);
+          const rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          rect.setAttribute("x", margin + index * barWidth);
+          rect.setAttribute("y", height - margin - barHeight);
+          rect.setAttribute("width", barWidth);
+          rect.setAttribute("height", barHeight);
+          rect.setAttribute("fill", "rgb(211, 211, 211)");
+          rect.setAttribute("stroke", "black");
+          rect.setAttribute("stroke-width", "1");
+
+          // Tooltip (title attribute)
+          rect.setAttribute("title", `f': ${density.toFixed(4)}`);
+
+          // Mouseover event listener for tooltip
+          rect.addEventListener("mouseover", (event) => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.textContent = `f': ${density.toFixed(4)}`;
+            tooltip.style.display = "block";
+            tooltip.style.top = `${event.clientY}px`;
+            tooltip.style.left = `${event.clientX}px`;
+            rect.setAttribute("fill", "gray");
+          });
+
+          // Mouseout event listener to hide tooltip
+          rect.addEventListener("mouseout", () => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+            rect.setAttribute("fill", "rgb(211, 211, 211)");
+          });
+
+          svg.appendChild(rect);
+        });
+
+        // Tooltip element
+        const tooltip = document.createElement("div");
+        tooltip.setAttribute("id", "tooltip");
+        tooltip.style.position = "absolute";
+        tooltip.style.display = "none";
+        tooltip.style.background = "rgba(0, 0, 0, 0.7)";
+        tooltip.style.color = "#fff";
+        tooltip.style.padding = "5px";
+        document.body.appendChild(tooltip);
+
+        // Add axis labels
+        const xAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        xAxisLabel.setAttribute("x", width / 2 - margin / 2 + 15);
+        xAxisLabel.setAttribute("y", height - margin / 2 + 20);
+        xAxisLabel.setAttribute("text-anchor", "center");
+        xAxisLabel.setAttribute("font-size", "22");
+        xAxisLabel.setAttribute("font-family", "Arial");
+        xAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        xAxisLabel.textContent = "D";
+        svg.appendChild(xAxisLabel);
+
+        const yAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        yAxisLabel.setAttribute("x", margin - 25);
+        yAxisLabel.setAttribute("y", margin + 30);
+        yAxisLabel.setAttribute("text-anchor", "middle");
+        yAxisLabel.setAttribute("font-size", "22");
+        yAxisLabel.setAttribute("font-family", "Arial");
+        yAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        yAxisLabel.textContent = "f'";
+        svg.appendChild(yAxisLabel);
+      }
+
+      // Modified analyzeByStrips function
+      function analyzeByStrips() {
+        const radius = parseFloat(document.getElementById("Radius").value) / 8;
+        const centerX =
+          parseFloat(document.getElementById("centerX").value) / 8 + 250 + 65;
+        const centerY =
+          parseFloat(document.getElementById("centerY").value) / -8 + 250 + 10;
+        const numStrips = parseInt(document.getElementById("numStrips").value);
+        const excludeCenter = document.getElementById("excludeCenter").checked;
+        const rotationAngle =
+          parseFloat(document.getElementById("rotationAngle").value) || 0;
+        const showLine = document.getElementById("showLine").checked;
+
+        const svg = document.getElementById("mySVG");
+        svg.innerHTML = "";
+        drawLinesAndText();
+
+        const stripResults = document.getElementById("stripResults");
+        stripResults.innerHTML = "";
+
+        // Draw main circle
+        const circle = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "circle"
+        );
+        circle.setAttribute("cx", centerX);
+        circle.setAttribute("cy", centerY);
+        circle.setAttribute("r", radius);
+        circle.setAttribute("stroke", "rgba(0,0,0, 0.1)");
+        circle.setAttribute("stroke-width", "1");
+        circle.setAttribute("fill", "none");
+        svg.appendChild(circle);
+
+        // Draw strips
+        const stripWidth = (2 * radius) / numStrips;
+        const stripCounts = Array(numStrips).fill(0);
+
+        for (let i = 0; i < numStrips; i++) {
+          const stripX = centerX - radius + i * stripWidth;
+
+          const rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          rect.setAttribute("x", stripX);
+          rect.setAttribute("y", centerY - radius);
+          rect.setAttribute("width", stripWidth);
+          rect.setAttribute("height", 2 * radius);
+          rect.setAttribute("stroke", "rgba(0,0,0, 0.1)");
+          rect.setAttribute("fill", `none`);
+          svg.appendChild(rect);
+        }
+
+        // Draw inner dashed circle if excludeCenter is checked
+        if (excludeCenter) {
+          const innerCircle = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle"
+          );
+          innerCircle.setAttribute("cx", centerX);
+          innerCircle.setAttribute("cy", centerY);
+          innerCircle.setAttribute("r", stripWidth / 2);
+          innerCircle.setAttribute("stroke", "rgba(0,0,0, 0.1)");
+          innerCircle.setAttribute("stroke-width", "1");
+          innerCircle.setAttribute("fill", "none");
+          innerCircle.setAttribute("stroke-dasharray", "2, 2");
+          svg.appendChild(innerCircle);
+        }
+
+        // Analyze data points
+        const data = getDataFromTable(); // Assuming you have a function to get data points
+
+        let maxEntries = 0;
+        let maxStripIndex = -1;
+
+        data.forEach((point, index) => {
+          const rotatedPoint = rotatePoint(
+            point.i,
+            point.x,
+            point.y,
+            centerX,
+            centerY,
+            rotationAngle
+          );
+          const distToCenter = Math.sqrt(
+            (rotatedPoint.x - centerX) ** 2 + (rotatedPoint.y - centerY) ** 2
+          );
+          const isInsideCenter = excludeCenter && distToCenter < stripWidth / 2;
+          const color =
+            distToCenter <= radius && !isInsideCenter ? "blue" : "red";
+          const fillColor =
+            distToCenter <= radius && !isInsideCenter
+              ? "lightblue"
+              : "lightcoral";
+
+          const ellipse = createCircleViewe(
+            rotatedPoint.i,
+            rotatedPoint.x,
+            rotatedPoint.y,
+            3,
+            0,
+            point.PA,
+            color,
+            fillColor,
+            point.BG
+          );
+          svg.appendChild(ellipse);
+
+          if (distToCenter <= radius && !isInsideCenter) {
+            const stripIndex = Math.floor(
+              (rotatedPoint.x - (centerX - radius)) / stripWidth
+            );
+            if (stripIndex >= 0 && stripIndex < numStrips) {
+              stripCounts[stripIndex]++;
+              if (stripCounts[stripIndex] > maxEntries) {
+                maxEntries = stripCounts[stripIndex];
+                maxStripIndex = stripIndex;
+              }
+            }
+          }
+        });
+
+        // Calculate areas of strips inside the circle
+        const totalCircleArea = Math.PI * radius * radius;
+        const stripAreas = calculateStripAreas(
+          radius,
+          numStrips,
+          stripWidth,
+          excludeCenter
+        );
+
+        const centralStripIndex = Math.floor(numStrips / 2);
+        // Display results
+        const histogramData = [];
+        stripCounts.forEach((count, index) => {
+          const stripArea = stripAreas[index];
+          const stripAreaFraction = stripArea / stripAreas[centralStripIndex];
+          stripResults.innerHTML += `<br><div><b>Strip ${
+            index + 1
+          }:</b> <b>${count} occ.</b>, S: ${stripArea.toFixed(
+            2
+          )}, S': ${stripAreaFraction.toFixed(4)}, f': ${(
+            count /
+            data.length /
+            stripAreaFraction
+          ).toFixed(4)}</div>`;
+
+          histogramData.push({ count, ringFraction: stripAreaFraction });
+        });
+
+        // Draw histogram
+        drawDensityHistogram(histogramData, numStrips);
+
+        // Highlight ellipses in the strip with the most entries
+        if (maxStripIndex !== -1) {
+          data.forEach((point, index) => {
+            const rotatedPoint = rotatePoint(
+              point.i,
+              point.x,
+              point.y,
+              centerX,
+              centerY,
+              rotationAngle
+            );
+            const distToCenter = Math.sqrt(
+              (rotatedPoint.x - centerX) ** 2 + (rotatedPoint.y - centerY) ** 2
+            );
+            const isInsideCenter =
+              excludeCenter && distToCenter < stripWidth / 2;
+
+            if (distToCenter <= radius && !isInsideCenter) {
+              const stripIndex = Math.floor(
+                (rotatedPoint.x - (centerX - radius)) / stripWidth
+              );
+              if (stripIndex === maxStripIndex) {
+                const ellipse = createCircleViewe(
+                  rotatedPoint.i,
+                  rotatedPoint.x,
+                  rotatedPoint.y,
+                  3,
+                  0,
+                  point.PA,
+                  "green",
+                  "lightgreen",
+                  point.BG
+                );
+                svg.appendChild(ellipse);
+              }
+            }
+          });
+        }
+
+        // Draw rotation line if showLine is checked
+        if (showLine) {
+          const lineLength = radius + 20;
+          const adjustedAngle = rotationAngle - 90; // Коригування кута для того, щоб 0 градусів був зверху
+          const angleInRadians = (adjustedAngle * Math.PI) / -180;
+          //const angleInRadians = ((rotationAngle * Math.PI) / -180);
+          //console.log(angleInRadians);
+          const startX = centerX - lineLength * Math.cos(angleInRadians);
+          const startY = centerY + lineLength * Math.sin(angleInRadians);
+          const endX = centerX + lineLength * Math.cos(angleInRadians);
+          const endY = centerY - lineLength * Math.sin(angleInRadians);
+
+          const line = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          line.setAttribute("x1", centerX);
+          line.setAttribute("y1", centerY);
+          line.setAttribute("x2", endX);
+          line.setAttribute("y2", endY);
+          line.setAttribute("stroke", "black");
+          line.setAttribute("stroke-width", "1");
+          line.setAttribute("stroke-dasharray", "5, 5");
+          svg.appendChild(line);
+
+          // Draw start circle for the line
+          const startCircle = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle"
+          );
+          startCircle.setAttribute("cx", centerX);
+          startCircle.setAttribute("cy", centerY);
+          startCircle.setAttribute("r", 2);
+          startCircle.setAttribute("stroke", "black");
+          startCircle.setAttribute("stroke-width", "1");
+          startCircle.setAttribute("fill", "black");
+          svg.appendChild(startCircle);
+        }
+      }
+
+      function rotatePoint(i, x, y, centerX, centerY, angle) {
+        const adjustedAngle = angle; // Коригування кута для того, щоб 0 градусів був зверху
+        //const angleInRadians = (adjustedAngle * Math.PI) / -180;
+        const radians = (adjustedAngle * Math.PI) / -180;
+        const cos = Math.cos(radians);
+        const sin = Math.sin(radians);
+        const dx = x - centerX;
+        const dy = y - centerY;
+
+        const nx = cos * dx - sin * dy + centerX;
+        const ny = sin * dx + cos * dy + centerY;
+        return { i: i, x: nx, y: ny };
+      }
+
+      function calculateStripAreas(
+        radius,
+        numStrips,
+        stripWidth,
+        excludeCenter
+      ) {
+        const stripAreas = [];
+        const innerRadius = excludeCenter ? stripWidth / 2 : 0;
+        // Calculate the index of the central strip
+        const centralStripIndex = Math.floor(numStrips / 2);
+
+        for (let i = 0; i < numStrips; i++) {
+          const stripX1 = -radius + i * stripWidth;
+          const stripX2 = stripX1 + stripWidth;
+
+          let area = 0;
+          for (let x = stripX1; x <= stripX2; x += 0.01) {
+            const h1 = Math.sqrt(Math.max(0, radius * radius - x * x));
+            const h2 = Math.sqrt(
+              Math.max(0, radius * radius - (x + 0.01) * x + 0.01)
+            );
+            area += (0.01 * (h1 + h2)) / 2;
+          }
+          //console.log(stripX1, stripX2);
+          if (excludeCenter && i === centralStripIndex) {
+            // console.log(stripX1, innerRadius, stripX2, -innerRadius);
+            const innerCircleArea = Math.PI * innerRadius * innerRadius;
+
+            area -= innerCircleArea;
+          }
+
+          stripAreas.push(area);
+        }
+
+        return stripAreas;
+      }
+
+      function calculateCircleSegmentArea(radius, x1, x2) {
+        const segmentArea =
+          radius ** 2 * (Math.acos(x1 / radius) - Math.acos(x2 / radius));
+        return segmentArea;
+      }
+
+      function findMaxEntriesAngle() {
+        const radius = parseFloat(document.getElementById("Radius").value) / 8;
+        const centerX =
+          parseFloat(document.getElementById("centerX").value) / 8 + 250 + 65;
+        const centerY =
+          parseFloat(document.getElementById("centerY").value) / -8 + 250 + 10;
+        const numStrips = parseInt(document.getElementById("numStrips").value);
+        const excludeCenter = document.getElementById("excludeCenter").checked;
+
+        let maxEntries = 0;
+        let bestAngle = 0;
+
+        for (let angle = 0; angle < 360; angle++) {
+          const stripWidth = (2 * radius) / numStrips;
+          const stripCounts = Array(numStrips).fill(0);
+          const data = getDataFromTable(); // Assuming you have a function to get data points
+
+          data.forEach((point, index) => {
+            const rotatedPoint = rotatePoint(
+              point.i,
+              point.x,
+              point.y,
+              centerX,
+              centerY,
+              angle
+            );
+            const distToCenter = Math.sqrt(
+              (rotatedPoint.x - centerX) ** 2 + (rotatedPoint.y - centerY) ** 2
+            );
+            const isInsideCenter =
+              excludeCenter && distToCenter < stripWidth / 2;
+
+            if (distToCenter <= radius && !isInsideCenter) {
+              const stripIndex = Math.floor(
+                (rotatedPoint.x - (centerX - radius)) / stripWidth
+              );
+              if (stripIndex >= 0 && stripIndex < numStrips) {
+                stripCounts[stripIndex]++;
+              }
+            }
+          });
+
+          const maxInCurrentAngle = Math.max(...stripCounts);
+          if (maxInCurrentAngle > maxEntries) {
+            maxEntries = maxInCurrentAngle;
+            bestAngle = angle;
+          }
+        }
+
+        const maxResults = document.getElementById("maxResults");
+        maxResults.innerHTML = `<br>Maximum entry: <b>${maxEntries}</b> at an angle: <b>${bestAngle}</b> degrees`;
+        document.getElementById("rotationAngle").value = bestAngle;
+      }
+
+      // Function to create an editable table
+      function createEditableTable(rows, cols) {
+        var tableBody = document.querySelector("#editableTable tbody");
+        tableBody.innerHTML = ""; // Clear existing table
+
+        for (var i = 0; i < rows; i++) {
+          var row = tableBody.insertRow(i);
+
+          // Add row number cell with grey background
+          var numberCell = row.insertCell(0);
+          numberCell.textContent = i + 1;
+          numberCell.classList.add("number-cell");
+
+          for (var j = 1; j < cols; j++) {
+            var cell = row.insertCell(j);
+            cell.contentEditable = true; // Set the cell to be editable
+          }
+        }
+      }
+
+      // Function to load data from a TXT file and populate the table
+      function loadDataFromFile(file) {
+        var table = document.getElementById("editableTable");
+        var reader = new FileReader();
+
+        reader.onload = function (e) {
+          var dataArray = e.target.result.split("\n");
+
+          // Create table with the number of rows equal to the number of lines in the file minus any empty lines at the end
+          var nonEmptyLines = dataArray.filter((line) => line.trim() !== "");
+          createEditableTable(nonEmptyLines.length, 7); // Assuming 7 columns based on header
+
+          for (var i = 0; i < nonEmptyLines.length; i++) {
+            var row = table.rows[i + 1]; // Adjust for header row
+            // Split data using regular expression to handle both tabs and multiple spaces
+            var rowData = nonEmptyLines[i].trim().split(/\s+/);
+
+            for (var j = 0; j < rowData.length; j++) {
+              var cell = row.cells[j + 1]; // Adjust for number cell
+              cell.innerHTML = rowData[j];
+            }
+          }
+
+          drawEllipses(); // Draw ellipses after loading data
+
+          // Calculate and set values for Radius, ringDistance, and numRings
+          var radius = calculateClusterRadius();
+          var ringWidth = document.getElementById("ringWith").value;
+          var ringDistance = radius * ringWidth;
+          var numRings = Math.ceil(radius / ringDistance);
+
+          document.getElementById("Radius").value = radius;
+          document.getElementById("ringDistance").value = ringDistance;
+          document.getElementById("numRings").value = numRings;
+          document.getElementById("centerX").value = 0;
+          document.getElementById("centerY").value = 0;
+          var svg = document.getElementById("histogramSVG");
+          var svg2 = document.getElementById("mySVG");
+          svg.innerHTML = ""; // Clear the SVG
+          //svg2.innerHTML = ""; // Clear the SVG
+          // Переконатися, що елемент існує
+if (svg2) {
+    svg2.scrollIntoView({
+        behavior: 'smooth', // Плавна прокрутка
+        block: 'center',    // Вирівнювання по вертикалі (по центру)
+        inline: 'nearest'   // Вирівнювання по горизонталі (найближче)
+    });
+}
+        };
+
+        reader.readAsText(file);
+      }
+
+      // Function to handle file upload
+      function handleFile() {
+        var fileInput = document.getElementById("fileInput");
+        var file = fileInput.files[0];
+
+        if (file) {
+          loadDataFromFile(file);
+        } else {
+          alert("Please select a file.");
+        }
+      }
+
+      function drawLinesAndText() {
+        const svg = document.getElementById("mySVG");
+
+        // Helper function to create an SVG line element with x1 and x2 adjusted by subtracting 420
+        function createLine(x1, y1, x2, y2, stroke = "black", strokeWidth = 1) {
+          const line = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          line.setAttribute("x1", x1);
+          line.setAttribute("y1", y1);
+          line.setAttribute("x2", x2);
+          line.setAttribute("y2", y2);
+          line.setAttribute("stroke", stroke);
+          line.setAttribute("stroke-width", strokeWidth);
+          return line;
+        }
+
+        // Helper function to create an SVG text element
+        function createText(
+          x,
+          y,
+          textContent,
+          fontSize = 18,
+          fontFamily = "Arial",
+          anchor = "start"
+        ) {
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", x); // Adjust x coordinate by subtracting 420
+          text.setAttribute("y", y);
+          text.setAttribute("font-size", fontSize);
+          text.setAttribute("font-family", fontFamily);
+          text.setAttribute("text-anchor", anchor); // Set text alignment
+          text.textContent = textContent;
+          return text;
+        }
+
+        // Add lines and text similar to the provided C++ code
+        svg.appendChild(createLine(65, 10, 65, 510, "black", 2));
+        svg.appendChild(createText(30, 35, "Y"));
+        svg.appendChild(createLine(65, 510, 565, 510, "black", 2));
+        svg.appendChild(createText(545, 538, "X"));
+
+        let tempValue = -2000;
+        let point = 1;
+
+        // Draw X-axis markers and labels
+        for (let x = 65; x <= 565; x += 31.2) {
+          if (point % 2 === 0) {
+            svg.appendChild(createLine(x, 510, x, 514, "black", 2));
+          } else {
+            svg.appendChild(createLine(x, 510, x, 518, "black", 2));
+            if (tempValue !== 2000) {
+              if (tempValue <= -1000 || tempValue >= 1000) {
+                svg.appendChild(
+                  createText(x + 20, 538, tempValue, 18, "Arial", "end")
+                );
+              } else if (tempValue !== 0) {
+                svg.appendChild(
+                  createText(x + 15, 538, tempValue, 18, "Arial", "end")
+                );
+              }
+            }
+            tempValue += 500;
+          }
+          point++;
+        }
+
+        svg.appendChild(createText(319, 538, 0, 18, "Arial", "end"));
+
+        tempValue = -2000;
+        point = 1;
+
+        // Draw Y-axis markers and labels
+        for (let y = 510; y >= 10; y -= 31.2) {
+          if (point % 2 === 0) {
+            svg.appendChild(createLine(61, y, 65, y, "black", 2));
+          } else {
+            svg.appendChild(createLine(58, y, 65, y, "black", 2));
+            if (tempValue !== 2000) {
+              svg.appendChild(
+                createText(53, y + 6, tempValue, 18, "Arial", "end")
+              );
+            }
+            tempValue += 500;
+          }
+          point++;
+        }
+      }
+
+      /* function createCircle(cx, cy, r, stroke = "blue", strokeWidth = 2) {
+                          const circle = document.createElementNS(
+                            "http://www.w3.org/2000/svg",
+                            "circle"
+                          );
+                          circle.setAttribute("cx", cx);
+                          circle.setAttribute("cy", cy);
+                          circle.setAttribute("r", r);
+                          circle.setAttribute("stroke", stroke);
+                          circle.setAttribute("stroke-width", strokeWidth);
+                          circle.setAttribute("fill", "none");
+                          circle.classList.add("ring");
+                          return circle;
+                        }
+                  */
+      function getDataFromTable() {
+        const data = [];
+        const rows = document.querySelectorAll("#editableTable tr");
+        rows.forEach((row, index) => {
+          if (index === 0) return; // Пропустити заголовок таблиці
+          const cells = row.querySelectorAll("td");
+          const i = parseFloat(cells[0].textContent);
+          const x = parseFloat(cells[1].textContent) / 8 + 250 + 65;
+          const y = parseFloat(cells[2].textContent) / -8 + 250 + 10;
+          // Отримуємо значення з клітинки таблиці
+          const m = parseFloat(cells[3].textContent.replace(",", "."));
+          const E = parseFloat(cells[4].textContent.replace(",", "."));
+          const PA = parseFloat(cells[5].textContent.replace(",", ".")); //correct PA
+          const BG = parseFloat(cells[6].textContent.replace(",", "."));
+          data.push({ i, x, y, m, E, PA, BG });
+        });
+
+        return data;
+      }
+
+      function calculateClusterRadius() {
+        const centerX =
+          parseFloat(document.getElementById("centerX").value) / 8 + 250 + 65;
+        const centerY =
+          parseFloat(document.getElementById("centerY").value) / -8 + 250 + 10;
+
+        const data = getDataFromTable();
+        function distance(x1, y1, x2, y2) {
+          return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+        let maxDistance = 0;
+        data.forEach((point) => {
+          const adjustedX = point.x;
+          const adjustedY = point.y;
+          const dist = distance(centerX, centerY, adjustedX, adjustedY);
+
+          if (dist > maxDistance) {
+            maxDistance = dist;
+          }
+        });
+        return Math.ceil(maxDistance) * 8;
+      }
+
+      function analyzeConcentration() {
+        document.getElementById("ringDistance").value =
+          document.getElementById("Radius").value *
+          document.getElementById("ringWith").value;
+        document.getElementById("numRings").value = //Math.ceil(
+          document.getElementById("Radius").value /
+          document.getElementById("ringDistance").value;
+        //);
+
+        // drawEllipsesRings();
+
+        let numRings = parseInt(document.getElementById("numRings").value);
+        const ringDistance =
+          parseFloat(document.getElementById("ringDistance").value) / 8;
+        const centerX =
+          parseFloat(document.getElementById("centerX").value) / 8 + 250 + 65;
+        const centerY =
+          parseFloat(document.getElementById("centerY").value) / -8 + 250 + 10;
+
+        const data = getDataFromTable();
+
+        function distance(x1, y1, x2, y2) {
+          return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+
+        let rings = Array(numRings).fill(0);
+        const svg = document.getElementById("mySVG");
+        svg.innerHTML = "";
+        drawLinesAndText();
+        const previousRings = svg.querySelectorAll(".ring");
+        previousRings.forEach((ring) => ring.remove());
+
+        let maxDist = 0;
+        const maxDistance = Math.max(
+          ...data.map((point) => distance(250 + 65, 250 + 10, point.x, point.y))
+        );
+        const lastRingOuterRadius = numRings * ringDistance;
+
+        if (maxDistance > lastRingOuterRadius) {
+          rings.push(0); // Додаємо нове кільце
+          numRings++;
+        }
+        data.forEach((point) => {
+          const adjustedX = point.x;
+          const adjustedY = point.y;
+          const dist = distance(centerX, centerY, adjustedX, adjustedY);
+          if (dist > maxDist) {
+            maxDist = dist;
+          }
+          rings.forEach((_, index) => {
+            const innerRadius = index * ringDistance;
+            var outerRadius = (index + 1) * ringDistance;
+            if (index == numRings - 1) outerRadius = maxDistance;
+            if (dist > innerRadius && dist <= outerRadius) {
+              rings[index]++;
+              const ellipse = createCircleViewe(
+                point.i,
+                point.x,
+                point.y,
+                3,
+                0,
+                point.PA,
+                "blue",
+                "lightblue",
+                point.BG
+              );
+              svg.appendChild(ellipse);
+            }
+            if (dist > outerRadius) {
+              const ellipse = createCircleViewe(
+                point.i,
+                point.x,
+                point.y,
+                3,
+                0,
+                point.PA,
+                "red",
+                "lightcoral",
+                point.BG
+              );
+              svg.appendChild(ellipse);
+            }
+          });
+        });
+
+        const totalArea = Math.PI * (1.0 * ringDistance) ** 2;
+        const resultsDiv = document.getElementById("results");
+const resultsDiv2 = document.getElementById("resultsCIO");
+
+        resultsDiv.innerHTML = "";
+        resultsDiv2.innerHTML = "";
+        const totalGalaxies = data.length;
+        rings.forEach((count, index) => {
+          const innerRadius = index * ringDistance;
+
+          var outerRadius = (index + 1) * ringDistance;
+          if (index == numRings - 1) outerRadius = maxDistance;
+          // console.log(index, numRings, innerRadius, outerRadius, maxDistance);
+          const ringArea = calculateRingArea(innerRadius, outerRadius);
+          const ringFraction = ringArea / totalArea;
+        //  const totalGalaxies = data.length;
+
+ 
+
+
+
+
+          resultsDiv.innerHTML += `<br><b>Ring ${
+            index + 1
+          }:</b> <b>${count} occ.</b>, S: ${ringArea.toFixed(
+            2
+          )}, S': ${ringFraction.toFixed(4)}, f': ${calculateDensity(
+            count,
+            totalGalaxies,
+            ringFraction
+          ).toFixed(4)}<br>`;
+        });
+// Calculate standard deviation
+        const meanCount =
+          rings.reduce((sum, count) => sum + count/totalGalaxies, 0) /
+          rings.length;
+        const variance =
+          rings.reduce(
+            (sum, count) => sum + (count/totalGalaxies - meanCount) ** 2,
+            0
+          ) /
+          (rings.length - 1);
+        const standardDeviation = Math.sqrt(variance);
+        //console.log(meanCount, variance, standardDeviation);
+
+        // Display standard deviation
+        resultsDiv2.innerHTML += `<br>
+              <b>The mean value: </b>&emsp;${meanCount.toFixed(4)}<br>
+              <b>Variance:</b>&emsp;${variance.toFixed(4)}<br>
+      <b>Standard Deviation (S):</b>&emsp;${standardDeviation.toFixed(4)}`;
+
+        for (let i = 1; i <= numRings; i++) {
+          if (i == numRings)
+            var circle = createCircle(centerX, centerY, maxDistance);
+          else circle = createCircle(centerX, centerY, i * ringDistance);
+          svg.appendChild(circle);
+        }
+        //const totalGalaxies = data.length;
+        const histogramData = rings.map((count, index) => {
+          //   const ringArea = Math.PI * ((index + 1) ** 2 - index ** 2) * ringDistance ** 2;
+          const innerRadius = index * ringDistance;
+
+          var outerRadius = (index + 1) * ringDistance;
+          if (index == numRings - 1) outerRadius = maxDistance;
+          // console.log(index, numRings, innerRadius, outerRadius, maxDistance);
+          const ringArea = calculateRingArea(innerRadius, outerRadius);
+          const ringFraction = ringArea / totalArea;
+          const density = calculateDensity(count, totalGalaxies, ringFraction);
+          // console.log(ringFraction, density);
+          return { density, ringFraction };
+        });
+
+        drawHistogram(histogramData, ringDistance, numRings);
+      }
+
+      function calculateDensity(count, totalGalaxies, ringFraction) {
+        const method = document.querySelector(
+          'input[name="densityCalculation"]:checked'
+        ).value;
+        if (method === "method1") {
+          // Враховувати долю площі
+          return count / totalGalaxies / ringFraction;
+        } else {
+          // Не враховувати долю площі
+          return count / totalGalaxies;
+        }
+      }
+
+      // Function to draw histogram with axes and borders
+      function drawHistogram(data, ringDistance, numRings) {
+        const svg = document.getElementById("histogramSVG");
+        svg.innerHTML = "";
+
+        const width = 575;
+        const height = 545;
+        const margin = 55;
+        let numRings2 = parseInt(document.getElementById("numRings").value);
+        var ringWidth = parseFloat(document.getElementById("ringWith").value);
+        //console.log(numRings2, ringWidth, numRings2 * ringWidth);
+        lastBar = numRings2 * ringWidth;
+        const barWidth = (width - margin * 2) / data.length;
+
+        const maxDensity = 0.4; //Math.max(...data.map((d) => d.density));
+
+        // Create X and Y axes
+        const xAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        xAxis.setAttribute("x1", margin);
+        xAxis.setAttribute("y1", height - margin);
+        xAxis.setAttribute("x2", width - margin);
+        xAxis.setAttribute("y2", height - margin);
+        xAxis.setAttribute("stroke-width", "2");
+        xAxis.setAttribute("stroke", "black");
+        svg.appendChild(xAxis);
+
+        const yAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        yAxis.setAttribute("x1", margin);
+        yAxis.setAttribute("y1", margin);
+        yAxis.setAttribute("x2", margin);
+        yAxis.setAttribute("y2", height - margin);
+        yAxis.setAttribute("stroke-width", "2");
+        yAxis.setAttribute("stroke", "black");
+        svg.appendChild(yAxis);
+
+        // Create X axis labels and ticks
+        const xAxisSteps = data.length; // Number of ticks based on data length
+        for (let i = 0; i <= xAxisSteps; i++) {
+          var x = margin + i * barWidth;
+          //if (i == xAxisSteps) x = margin + i * barWidth * lastBar;
+          // Labels
+          if (i < xAxisSteps) {
+            // Avoid adding label for the last tick
+            const text = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "text"
+            );
+            text.setAttribute("x", x);
+            text.setAttribute("y", height - margin + 25);
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("font-size", "18");
+            text.setAttribute("font-family", "Arial");
+            text.textContent = (
+              i * document.getElementById("ringWith").value
+            ).toFixed(2); // Adjust label value
+            svg.appendChild(text);
+          }
+
+          // Ticks
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", x);
+          tick.setAttribute("y1", height - margin);
+          tick.setAttribute("x2", x);
+          tick.setAttribute("y2", height - margin + 5);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+        }
+
+        // Create Y axis labels, ticks, and grid lines
+        const yAxisSteps = 5;
+        for (let i = 0; i <= yAxisSteps; i++) {
+          const y = height - margin - ((height - margin * 2) / yAxisSteps) * i;
+          const densityValue = ((maxDensity * i) / yAxisSteps).toFixed(2);
+
+          // Labels
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", margin - 10);
+          text.setAttribute("y", y + 3);
+          text.setAttribute("text-anchor", "end");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          text.textContent = i === yAxisSteps ? "" : densityValue; // Hide label for the last tick
+          svg.appendChild(text);
+
+          // Ticks
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", margin - 5);
+          tick.setAttribute("y1", y);
+          tick.setAttribute("x2", margin);
+          tick.setAttribute("y2", y);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+
+          // Grid lines
+          const gridLine = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          gridLine.setAttribute("x1", margin);
+          gridLine.setAttribute("y1", y);
+          gridLine.setAttribute("x2", width - margin);
+          gridLine.setAttribute("y2", y);
+          gridLine.setAttribute("stroke", "lightgray");
+          gridLine.setAttribute("stroke-dasharray", "2,2");
+          svg.appendChild(gridLine);
+        }
+
+        // Create bars with borders
+        data.forEach((d, index) => {
+          const barHeight = (d.density / maxDensity) * (height - margin * 2);
+
+          let adjustedBarWidth = barWidth;
+          // if (index == numRings - 1) adjustedBarWidth = barWidth * lastBar;
+          // var x = margin + i * barWidth;
+
+          var x = margin + index * barWidth;
+          // if (index == numRings - 1) x = margin + index * barWidth * lastBar;
+          //  console.log(adjustedBarWidth, barWidth, index, numRings - 1, x);
+          const rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          // Adjust the width of the last bar if it doesn't fit
+
+          if (
+            index === data.length - 1 &&
+            Math.floor(numRings2) * ringWidth != 1
+          ) {
+            // adjustedBarWidth = width - margin - x ;
+            // adjustedBarWidth = barWidth * lastBar;
+            adjustedBarWidth =
+              ((1 - Math.floor(numRings2) * ringWidth) * barWidth) / ringWidth;
+          }
+
+          rect.setAttribute("x", x);
+          rect.setAttribute("y", height - margin - barHeight);
+          rect.setAttribute("width", adjustedBarWidth);
+          rect.setAttribute("height", barHeight);
+          rect.setAttribute("fill", "rgb(211, 211, 211)");
+          rect.setAttribute("stroke", "black");
+          rect.setAttribute("stroke-width", "1");
+          svg.appendChild(rect);
+        });
+
+        // Add axis labels
+        const xAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        xAxisLabel.setAttribute("x", width - margin - 5);
+        xAxisLabel.setAttribute("y", height - margin + 25);
+        xAxisLabel.setAttribute("text-anchor", "end");
+        xAxisLabel.setAttribute("font-size", "22");
+        xAxisLabel.setAttribute("font-family", "Arial");
+        xAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        xAxisLabel.textContent = "R";
+        svg.appendChild(xAxisLabel);
+
+        const yAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        yAxisLabel.setAttribute("x", margin - 25);
+        yAxisLabel.setAttribute("y", margin + 30);
+        yAxisLabel.setAttribute("text-anchor", "middle");
+        yAxisLabel.setAttribute("font-size", "22");
+        yAxisLabel.setAttribute("font-family", "Arial");
+        yAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        yAxisLabel.textContent = "f'";
+        svg.appendChild(yAxisLabel);
+
+        // Create bars with borders and tooltips
+        data.forEach((d, index) => {
+          const barHeight = (d.density / maxDensity) * (height - margin * 2);
+          let adjustedBarWidth = barWidth;
+          const x = margin + index * barWidth;
+
+          // Adjust the width of the last bar if it doesn't fit
+          if (
+            index === data.length - 1 &&
+            Math.floor(numRings2) * ringWidth != 1
+          ) {
+            // adjustedBarWidth = width - margin - x ;
+            //adjustedBarWidth = barWidth * lastBar;
+            adjustedBarWidth =
+              ((1 - Math.floor(numRings2) * ringWidth) * barWidth) / ringWidth;
+          }
+
+          const rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          rect.setAttribute("x", x);
+          rect.setAttribute("y", height - margin - barHeight);
+          rect.setAttribute("width", adjustedBarWidth);
+          rect.setAttribute("height", barHeight);
+          rect.setAttribute("fill", "rgb(211, 211, 211)");
+          rect.setAttribute("stroke", "black");
+          rect.setAttribute("stroke-width", "1");
+
+          // Tooltip (title attribute)
+          rect.setAttribute("title", `f': ${d.density}`);
+
+          // Mouseover event listener for tooltip
+          rect.addEventListener("mouseover", (event) => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.textContent = `f': ${d.density.toFixed(4)}`;
+            tooltip.style.display = "block";
+            tooltip.style.top = `${event.clientY}px`;
+            tooltip.style.left = `${event.clientX}px`;
+            rect.setAttribute("fill", "gray");
+          });
+
+          // Mouseout event listener to hide tooltip
+          rect.addEventListener("mouseout", () => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+            rect.setAttribute("fill", "rgb(211, 211, 211)");
+          });
+
+          svg.appendChild(rect);
+        });
+
+        // Tooltip element
+        const tooltip = document.createElement("div");
+        tooltip.setAttribute("id", "tooltip");
+        tooltip.style.position = "absolute";
+        tooltip.style.display = "none";
+        tooltip.style.background = "rgba(0, 0, 0, 0.7)";
+        tooltip.style.color = "#fff";
+        tooltip.style.padding = "5px";
+        document.body.appendChild(tooltip);
+      }
+
+      function calculateRingArea(innerRadius, outerRadius) {
+        const pi = Math.PI;
+        const outerArea = pi * outerRadius ** 2;
+        const innerArea = pi * innerRadius ** 2;
+        return outerArea - innerArea;
+      }
+
+      function drawHistogramPA(data, numBins) {
+        const svg = document.getElementById("histogramSVG");
+        svg.innerHTML = "";
+
+        const width = 575;
+        const height = 545;
+        const margin = 55;
+
+        // Обчислення кутів PA
+        const paValues = data.map((d) => d.PA);
+
+        // Розподіл кутів на бін
+        const binWidth = 180 / numBins; // Діапазон [0, 360] розділений на кількість бін
+        const bins = new Array(numBins).fill(0);
+
+        paValues.forEach((value) => {
+          const binIndex = Math.floor(value / binWidth);
+          if (binIndex >= 0 && binIndex < numBins) {
+            bins[binIndex]++;
+          }
+        });
+
+        // Масштабування значень бінів
+        const totalGalaxies = data.length;
+        const barWidth = (width - margin * 2) / numBins;
+        const maxBinValue = 0.25;
+
+        // Створення осей X і Y
+        const xAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        xAxis.setAttribute("x1", margin);
+        xAxis.setAttribute("y1", height - margin);
+        xAxis.setAttribute("x2", width - margin);
+        xAxis.setAttribute("y2", height - margin);
+        xAxis.setAttribute("stroke-width", "2");
+        xAxis.setAttribute("stroke", "black");
+        svg.appendChild(xAxis);
+
+        const yAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        yAxis.setAttribute("x1", margin);
+        yAxis.setAttribute("y1", margin);
+        yAxis.setAttribute("x2", margin);
+        yAxis.setAttribute("y2", height - margin);
+        yAxis.setAttribute("stroke-width", "2");
+        yAxis.setAttribute("stroke", "black");
+        svg.appendChild(yAxis);
+
+        // Створення підписів осі X та тік
+        for (let i = 0; i <= numBins; i++) {
+          const x = margin + i * barWidth;
+
+          // Підписи
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", x);
+          text.setAttribute("y", height - margin + 25);
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          if (i % 2 == 0) text.textContent = (i * binWidth).toFixed(0);
+          svg.appendChild(text);
+
+          // Тіки
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", x);
+          tick.setAttribute("y1", height - margin);
+          tick.setAttribute("x2", x);
+          tick.setAttribute("y2", height - margin + 5);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+        }
+
+        // Створення підписів осі Y, тік та сітки
+        const yAxisSteps = 5;
+        for (let i = 0; i < yAxisSteps; i++) {
+          const y = height - margin - ((height - margin * 2) / yAxisSteps) * i;
+          const relativeFrequency = ((maxBinValue * i) / yAxisSteps).toFixed(2); //(i / yAxisSteps).toFixed(2);
+
+          // Підписи
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", margin - 10);
+          text.setAttribute("y", y + 3);
+          text.setAttribute("text-anchor", "end");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          text.textContent = relativeFrequency;
+          svg.appendChild(text);
+
+          // Тіки
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", margin - 5);
+          tick.setAttribute("y1", y);
+          tick.setAttribute("x2", margin);
+          tick.setAttribute("y2", y);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+
+          // Сітка
+          const gridLine = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          gridLine.setAttribute("x1", margin);
+          gridLine.setAttribute("y1", y);
+          gridLine.setAttribute("x2", width - margin);
+          gridLine.setAttribute("y2", y);
+          gridLine.setAttribute("stroke", "lightgray");
+          gridLine.setAttribute("stroke-dasharray", "2,2");
+          svg.appendChild(gridLine);
+        }
+
+        // Створення стовпчиків з бордюрами
+        bins.forEach((binValue, index) => {
+          // const barHeight = (binValue / totalGalaxies) * (height - margin * 2); // Зміна масштабування
+          const barHeight =
+            ((binValue / totalGalaxies) * (height - margin * 2)) / maxBinValue; // Зміна масштабування
+
+          const rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          rect.setAttribute("x", margin + index * barWidth);
+          rect.setAttribute("y", height - margin - barHeight);
+          rect.setAttribute("width", barWidth);
+          rect.setAttribute("height", barHeight);
+          rect.setAttribute("fill", "rgb(211, 211, 211)");
+          rect.setAttribute("stroke", "black");
+          rect.setAttribute("stroke-width", "1");
+
+          // Tooltip (title attribute)
+          rect.setAttribute(
+            "title",
+            `f': ${(binValue / totalGalaxies).toFixed(3)}`
+          );
+
+          // Mouseover event listener for tooltip
+          rect.addEventListener("mouseover", (event) => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.textContent = `f': ${(binValue / totalGalaxies).toFixed(
+              3
+            )}`;
+            tooltip.style.display = "block";
+            tooltip.style.top = `${event.clientY}px`;
+            tooltip.style.left = `${event.clientX}px`;
+            rect.setAttribute("fill", "gray");
+          });
+
+          // Mouseout event listener to hide tooltip
+          rect.addEventListener("mouseout", () => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+            rect.setAttribute("fill", "rgb(211, 211, 211)");
+          });
+
+          svg.appendChild(rect);
+        });
+
+        // Tooltip element
+        const tooltip = document.createElement("div");
+        tooltip.setAttribute("id", "tooltip");
+        tooltip.style.position = "absolute";
+        tooltip.style.display = "none";
+        tooltip.style.background = "rgba(0, 0, 0, 0.7)";
+        tooltip.style.color = "#fff";
+        tooltip.style.padding = "5px";
+        document.body.appendChild(tooltip);
+
+        // Додавання підписів осей
+        const xAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        xAxisLabel.setAttribute("x", width / 2);
+        xAxisLabel.setAttribute("y", height - margin / 2 + 20);
+        xAxisLabel.setAttribute("text-anchor", "middle");
+        xAxisLabel.setAttribute("font-size", "22");
+        xAxisLabel.setAttribute("font-family", "Arial");
+        xAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        xAxisLabel.textContent = "PA";
+        svg.appendChild(xAxisLabel);
+
+        const yAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        yAxisLabel.setAttribute("x", margin - 25);
+        yAxisLabel.setAttribute("y", margin + 30);
+        yAxisLabel.setAttribute("text-anchor", "middle");
+        yAxisLabel.setAttribute("font-size", "22");
+        yAxisLabel.setAttribute("font-family", "Arial");
+        yAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        yAxisLabel.textContent = "f'";
+        svg.appendChild(yAxisLabel);
+      }
+
+      // Function to draw histogram for ellipticities
+      function drawHistogramEllipticities(data, numBins) {
+        const svg = document.getElementById("histogramSVG");
+        svg.innerHTML = "";
+
+        const width = 575;
+        const height = 545;
+        const margin = 55;
+
+
+
+// Переконатися, що елемент існує
+if (svg) {
+    svg.scrollIntoView({
+        behavior: 'smooth', // Плавна прокрутка
+        block: 'center',    // Вирівнювання по вертикалі (по центру)
+        inline: 'nearest'   // Вирівнювання по горизонталі (найближче)
+    });
+}
+
+
+        // Extract ellipticities
+        const ellipticityValues = data.map((d) => d.E);
+
+        // Bin the ellipticity values
+        const binWidth = 1 / numBins; // Range [0, 1] divided by number of bins
+        const bins = new Array(numBins).fill(0);
+
+        ellipticityValues.forEach((value) => {
+          const binIndex = Math.floor(value / binWidth);
+          if (binIndex >= 0 && binIndex < numBins) {
+            bins[binIndex]++;
+          }
+        });
+
+        // Normalize bin values
+        const totalGalaxies = data.length;
+        const maxBinValue = Math.max(...bins);
+        console.log(maxBinValue);
+        const barWidth = (width - margin * 2) / numBins;
+
+        // Create X and Y axes
+        const xAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        xAxis.setAttribute("x1", margin);
+        xAxis.setAttribute("y1", height - margin);
+        xAxis.setAttribute("x2", width - margin);
+        xAxis.setAttribute("y2", height - margin);
+        xAxis.setAttribute("stroke-width", "2");
+        xAxis.setAttribute("stroke", "black");
+        svg.appendChild(xAxis);
+
+        const yAxis = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "line"
+        );
+        yAxis.setAttribute("x1", margin);
+        yAxis.setAttribute("y1", margin);
+        yAxis.setAttribute("x2", margin);
+        yAxis.setAttribute("y2", height - margin);
+        yAxis.setAttribute("stroke-width", "2");
+        yAxis.setAttribute("stroke", "black");
+        svg.appendChild(yAxis);
+
+        // Create X axis labels and ticks
+        for (let i = 0; i <= numBins; i++) {
+          const x = margin + i * barWidth;
+
+          // Labels
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", x);
+          text.setAttribute("y", height - margin + 25);
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          text.textContent = (i * binWidth).toFixed(2);
+          svg.appendChild(text);
+
+          // Ticks
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", x);
+          tick.setAttribute("y1", height - margin);
+          tick.setAttribute("x2", x);
+          tick.setAttribute("y2", height - margin + 5);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+        }
+
+        // Create Y axis labels, ticks, and grid lines
+        const yAxisSteps = 5;
+        for (let i = 0; i <= yAxisSteps; i++) {
+          const y = height - margin - ((height - margin * 2) / yAxisSteps) * i;
+          const densityValue = (
+            (maxBinValue * i) /
+            yAxisSteps /
+            totalGalaxies
+          ).toFixed(2);
+
+          // Labels
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          text.setAttribute("x", margin - 10);
+          text.setAttribute("y", y + 3);
+          text.setAttribute("text-anchor", "end");
+          text.setAttribute("font-size", "18");
+          text.setAttribute("font-family", "Arial");
+          text.textContent = i === yAxisSteps ? "" : densityValue; // Hide the text for the last value
+          svg.appendChild(text);
+
+          // Ticks
+          const tick = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          tick.setAttribute("x1", margin - 5);
+          tick.setAttribute("y1", y);
+          tick.setAttribute("x2", margin);
+          tick.setAttribute("y2", y);
+          tick.setAttribute("stroke", "black");
+          svg.appendChild(tick);
+
+          // Grid lines
+          const gridLine = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+          gridLine.setAttribute("x1", margin);
+          gridLine.setAttribute("y1", y);
+          gridLine.setAttribute("x2", width - margin);
+          gridLine.setAttribute("y2", y);
+          gridLine.setAttribute("stroke", "lightgray");
+          gridLine.setAttribute("stroke-dasharray", "2,2");
+          svg.appendChild(gridLine);
+        }
+
+        // Create bars with borders
+        bins.forEach((binValue, index) => {
+          const barHeight = (binValue / maxBinValue) * (height - margin * 2);
+          const rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          rect.setAttribute("x", margin + index * barWidth);
+          rect.setAttribute("y", height - margin - barHeight);
+          rect.setAttribute("width", barWidth);
+          rect.setAttribute("height", barHeight);
+          rect.setAttribute("fill", "rgb(211, 211, 211)");
+          rect.setAttribute("stroke", "black");
+          rect.setAttribute("stroke-width", "1");
+
+          // Tooltip (title attribute)
+          rect.setAttribute(
+            "title",
+            `f': ${(binValue / totalGalaxies).toFixed(4)}`
+          );
+
+          // Mouseover event listener for tooltip
+          rect.addEventListener("mouseover", (event) => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.textContent = `f: ${(binValue / totalGalaxies).toFixed(4)}`;
+            tooltip.style.display = "block";
+            tooltip.style.top = `${event.clientY}px`;
+            tooltip.style.left = `${event.clientX}px`;
+            rect.setAttribute("fill", "gray");
+          });
+
+          // Mouseout event listener to hide tooltip
+          rect.addEventListener("mouseout", () => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+            rect.setAttribute("fill", "rgb(211, 211, 211)");
+          });
+
+          svg.appendChild(rect);
+        });
+
+        // Tooltip element
+        const tooltip = document.createElement("div");
+        tooltip.setAttribute("id", "tooltip");
+        tooltip.style.position = "absolute";
+        tooltip.style.display = "none";
+        tooltip.style.background = "rgba(0, 0, 0, 0.7)";
+        tooltip.style.color = "#fff";
+        tooltip.style.padding = "5px";
+        document.body.appendChild(tooltip);
+
+        // Add axis labels
+        const xAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        xAxisLabel.setAttribute("x", width / 2 - margin / 2 + 15);
+        xAxisLabel.setAttribute("y", height - margin / 2 + 20);
+        xAxisLabel.setAttribute("text-anchor", "center");
+        xAxisLabel.setAttribute("font-size", "22");
+        xAxisLabel.setAttribute("font-family", "Arial");
+        xAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        xAxisLabel.textContent = "E";
+        svg.appendChild(xAxisLabel);
+
+        const yAxisLabel = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        yAxisLabel.setAttribute("x", margin - 25);
+        yAxisLabel.setAttribute("y", margin + 30);
+        yAxisLabel.setAttribute("text-anchor", "middle");
+        yAxisLabel.setAttribute("font-size", "22");
+        yAxisLabel.setAttribute("font-family", "Arial");
+        yAxisLabel.setAttribute(
+          "style",
+          "font-weight: bold; font-style: italic;"
+        );
+        yAxisLabel.textContent = "f";
+        svg.appendChild(yAxisLabel);
+      }
+
+      async function findHighestDensityCenter(
+        centerX,
+        centerY,
+        ringDistance,
+        searchRadius,
+        data
+      ) {
+        const totalSteps = -(-searchRadius - searchRadius);
+
+        let step = Math.round(totalSteps / 7);
+        const progressPercentage =
+          document.getElementById("progressPercentage");
+        const resultsDiv = document.getElementById(
+          "resultFindHighestDensityCenter"
+        );
+        resultsDiv.innerHTML = "";
+
+        progressPercentage.style.display = "block"; // Показати прогрес-бар
+
+        let maxDensity = 0;
+        let bestCenter = { x: centerX, y: centerY };
+        let i = 0;
+        for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+          for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+            const currentCenterX = centerX + dx;
+            const currentCenterY = centerY + dy;
+            let count = 0;
+
+            data.forEach((point) => {
+              const dist = Math.sqrt(
+                (currentCenterX - point.x) ** 2 +
+                  (currentCenterY - point.y) ** 2
+              );
+
+              if (dist < ringDistance) {
+                count++;
+              }
+            });
+
+            if (count > maxDensity) {
+              maxDensity = count;
+              bestCenter = { x: currentCenterX, y: currentCenterY };
+            }
+          }
+          if (i % step == 0) {
+            const progress = Math.floor((i / totalSteps) * 100);
+
+            progressPercentage.innerText = `${progress}%`;
+            await new Promise((resolve) => setTimeout(resolve, 0)); // Allow DOM update
+          }
+          i++;
+        }
+
+        progressPercentage.innerText = `100%`;
+
+        resultsDiv.innerHTML = `${maxDensity} occurrences`;
+        //(x - 250 - 65) * 8}, y: ${   (y - 250 - 10) * -8
+        // Draw the best center for visualization
+        document.getElementById("centerX").value =
+          (bestCenter.x - 250 - 65) * 8;
+        document.getElementById("centerY").value =
+          (bestCenter.y - 250 - 10) * -8;
+        const svg = document.getElementById("mySVG");
+        const bestCenterCircle = createCircle(
+          bestCenter.x,
+          bestCenter.y,
+          5,
+          "red"
+        );
+        svg.appendChild(bestCenterCircle);
+
+        // Draw ellipses within the ring for the highest density center
+        data.forEach((point) => {
+          const dist = Math.sqrt(
+            (bestCenter.x - point.x) ** 2 + (bestCenter.y - point.y) ** 2
+          );
+
+          if (dist < ringDistance) {
+            const ellipse = createCircle(point.x, point.y, 3, "green", "black");
+            svg.appendChild(ellipse);
+          }
+          progressPercentage.style.display = "none";
+        });
+
+        // Draw the ring for visualization
+        const ring = createCircle(
+          bestCenter.x,
+          bestCenter.y,
+          ringDistance,
+          "red"
+        );
+
+        //----------------------------------
+        ring.setAttribute("fill", "none");
+        svg.appendChild(ring);
+      }
+
+      // Dummy function for creating circles (to be implemented)
+      function createCircle(
+        cx,
+        cy,
+        r,
+        color = "rgba(0, 0, 0, 0.15)",
+        fillColor = "none"
+      ) {
+        const circle = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "circle"
+        );
+        circle.setAttribute("cx", cx);
+        circle.setAttribute("cy", cy);
+        circle.setAttribute("r", r);
+        circle.setAttribute("stroke", color);
+        circle.setAttribute("stroke-width", 1);
+        circle.setAttribute("fill", fillColor);
+        return circle;
+      }
+
+      function createCircleViewe(i, x, y, m, E, PA, color, fillColor, BG) {
+        var table = document.getElementById("editableTable");
+        var radius = m;
+        var ellipticity = E;
+        var angle = PA;
+        var A =
+          radius /
+          Math.pow(1 - 2 * ellipticity + ellipticity * ellipticity, 1 / 4);
+        var B = (radius * radius) / A;
+
+        var ellipse = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "ellipse"
+        );
+        ellipse.setAttribute("cx", x);
+        ellipse.setAttribute("cy", y);
+        ellipse.setAttribute("rx", A);
+        ellipse.setAttribute("ry", B);
+        ellipse.setAttribute("transform", `rotate(${angle + 90}, ${x}, ${y})`);
+        ellipse.setAttribute("stroke", color); // color
+        if(BG==0)
+        ellipse.setAttribute("stroke-width", 1);
+      else ellipse.setAttribute("stroke-width", 2);
+        ellipse.setAttribute("fill", fillColor);
+        ellipse.setAttribute("data-row-index", i);
+
+        // Add event listener to display tooltip when mouse hovers over ellipse
+        ellipse.addEventListener(
+          "mouseover",
+          (function (x, y, radius, ellipticity, angle) {
+            return function (event) {
+              // this.setAttribute("stroke", "red");
+              //  this.setAttribute("stroke-width", "2");
+              var tooltip = document.getElementById("tooltip");
+              tooltip.style.display = "block";
+              tooltip.style.left = event.pageX + "px";
+              tooltip.style.top = event.pageY + "px";
+              tooltip.innerHTML = `x: ${(x - 250 - 65) * 8}, y: ${
+                (y - 250 - 10) * -8
+              }, size: ${
+                radius * 2
+              }, ellipticity: ${ellipticity}, angle: ${angle}`;
+            };
+          })(x, y, radius, ellipticity, angle)
+        );
+
+        // Remove tooltip and highlighting when mouse leaves ellipse
+        ellipse.addEventListener("mouseout", function () {
+          //this.setAttribute("stroke", "black");
+          //this.setAttribute("stroke-width", "1");
+          var tooltip = document.getElementById("tooltip");
+          tooltip.style.display = "none";
+        });
+
+        // Add event listener to highlight table row when ellipse is clicked
+           // Remove highlight from any previously highlighted ellipse
+
+ellipse.addEventListener("click", function () {
+  
+  // Remove highlight from any previously highlighted row
+    var highlightedRow = document.querySelector(".highlight");
+    if (highlightedRow) {
+        highlightedRow.classList.remove("highlight");
+    }
+
+    // Remove highlight from any previously highlighted ellipse
+    var highlightedEllipse = document.querySelector(".highlight-ellipse");
+    if (highlightedEllipse) {
+        highlightedEllipse.classList.remove("highlight-ellipse");
+        highlightedEllipse.setAttribute("stroke", "black");
+        highlightedEllipse.setAttribute("stroke-width", "1");
+    }
+
+    // Highlight the corresponding row in the table
+    var rowIndex = this.getAttribute("data-row-index");
+    var selectedRow = table.rows[rowIndex];
+ 
+    if (selectedRow) {
+        selectedRow.classList.add("highlight");
+    }
+       var highlightedRow = document.querySelector('.highlight');
+     // Scroll the table to the highlighted row
+     //console.log(highlightedRow);
+                highlightedRow.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest"
+        });
+
+    // Highlight the corresponding ellipse
+    this.classList.add("highlight-ellipse");
+    this.setAttribute("stroke", "red");
+    this.setAttribute("stroke-width", "2");
+});
+
+
+        return ellipse;
+      }
+      
+      function toggleRings() {
+        const showRings = document.getElementById("showRings").checked;
+        const rings = document.querySelectorAll(".ring");
+        rings.forEach((ring) => {
+          ring.style.display = showRings ? "block" : "none";
+        });
+      }
+
+      // Function to draw ellipses on the SVG based on table data
+      function drawEllipsesRings() {
+        var svg = document.getElementById("mySVG");
+        var table = document.getElementById("editableTable");
+
+        svg.innerHTML = ""; // Clear the SVG
+        drawLinesAndText();
+        for (var i = 1; i < table.rows.length; i++) {
+          var x =
+            parseFloat(table.rows[i].cells[1].innerHTML.replace(",", ".")) / 8 +
+            250 +
+            65;
+          var y =
+            -parseFloat(table.rows[i].cells[2].innerHTML.replace(",", ".")) /
+              8 +
+            250 +
+            10; // --------------------------
+          var radius = 3;
+          var ellipticity = 0;
+          var angle = parseFloat(
+            table.rows[i].cells[5].innerHTML.replace(",", ".")
+          );
+          var A =
+            radius /
+            Math.pow(1 - 2 * ellipticity + ellipticity * ellipticity, 1 / 4);
+          var B = (radius * radius) / A;
+
+          var ellipse = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "ellipse"
+          );
+          ellipse.setAttribute("cx", x);
+          ellipse.setAttribute("cy", y);
+          ellipse.setAttribute("rx", A);
+          ellipse.setAttribute("ry", B);
+          ellipse.setAttribute("fill", "rgba(255,0,0,0.8)");
+          ellipse.setAttribute("stroke", "black");
+          ellipse.setAttribute(
+            "transform",
+            `rotate(${angle + 90}, ${x}, ${y})`
+          );
+          ellipse.setAttribute("data-row-index", i);
+
+          // Add event listener to display tooltip when mouse hovers over ellipse
+          ellipse.addEventListener(
+            "mouseover",
+            (function (x, y, radius, ellipticity, angle) {
+              return function (event) {
+                this.setAttribute("stroke", "black");
+                this.setAttribute("stroke-width", "3");
+                var tooltip = document.getElementById("tooltip");
+                tooltip.style.display = "block";
+                tooltip.style.left = event.pageX + "px";
+                tooltip.style.top = event.pageY + "px";
+                tooltip.innerHTML = `x: ${(x - 250 - 65) * 8}, y: ${
+                  (y - 250 - 10) * -8
+                }, size: ${radius}, ellipticity: ${ellipticity}, angle: ${angle}`;
+              };
+            })(x, y, radius, ellipticity, angle)
+          );
+
+          // Remove tooltip and highlighting when mouse leaves ellipse
+          ellipse.addEventListener("mouseout", function () {
+            this.setAttribute("stroke", "black");
+            this.setAttribute("stroke-width", "1");
+            var tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+          });
+
+          // Add event listener to highlight table row when ellipse is clicked
+          ellipse.addEventListener("click", function () {
+            // Remove highlight from any previously highlighted row
+            var highlightedRow = document.querySelector(".highlight");
+            if (highlightedRow) {
+              highlightedRow.classList.remove("highlight");
+            }
+
+            // Remove highlight from any previously highlighted ellipse
+            var highlightedEllipse =
+              document.querySelector(".highlight-ellipse");
+            if (highlightedEllipse) {
+              highlightedEllipse.classList.remove("highlight-ellipse");
+              highlightedEllipse.setAttribute("stroke", "black");
+              highlightedEllipse.setAttribute("stroke-width", "1");
+            }
+
+            // Highlight the corresponding row in the table
+            var rowIndex = this.getAttribute("data-row-index");
+            table.rows[rowIndex].classList.add("highlight");
+            // Highlight the corresponding ellipse
+            this.classList.add("highlight-ellipse");
+            this.setAttribute("stroke", "red");
+            this.setAttribute("stroke-width", "2");
+          });
+
+          svg.appendChild(ellipse);
+        }
+        /*
+                    // Add event listener to highlight ellipse when table row is clicked
+                    Array.from(table.rows).forEach((row, index) => {
+                      row.addEventListener("click", function () {
+                        // Remove highlight from any previously highlighted ellipse
+                        var highlightedEllipse =
+                          document.querySelector(".highlight-ellipse");
+                        if (highlightedEllipse) {
+                          highlightedEllipse.classList.remove("highlight-ellipse");
+                          highlightedEllipse.setAttribute("stroke", "black");
+                          highlightedEllipse.setAttribute("stroke-width", "1");
+                        }
+
+                        // Remove highlight from any previously highlighted row
+                        var highlightedRow = document.querySelector(".highlight");
+                        if (highlightedRow) {
+                          highlightedRow.classList.remove("highlight");
+                        }
+
+                        // Highlight the corresponding ellipse
+                        var ellipse = svg.querySelector(
+                          `ellipse[data-row-index="${index}"]`
+                        );
+                        if (ellipse) {
+                          ellipse.classList.add("highlight-ellipse");
+                          ellipse.setAttribute("stroke", "red");
+                          ellipse.setAttribute("stroke-width", "2");
+                        }
+
+                        // Highlight the clicked row
+                        this.classList.add("highlight");
+                      });
+                    });*/
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        drawLinesAndText();
+
+        // Налаштування вкладок
+        const tabLinks = document.querySelectorAll(".tab-link");
+        const tabContents = document.querySelectorAll(".tab-content");
+
+        tabLinks.forEach((link) => {
+          link.addEventListener("click", function () {
+            tabLinks.forEach((item) => item.classList.remove("active"));
+            tabContents.forEach((item) => item.classList.remove("active"));
+
+            link.classList.add("active");
+            const tabId = link.getAttribute("data-tab");
+            document.getElementById(tabId).classList.add("active");
+          });
+        });
+
+        tabLinks[0].classList.add("active");
+        tabContents[0].classList.add("active");
+      });
+
+      function findNearbyGalaxiesWithSimilarOrientation(data) {
+        var svg = document.getElementById("mySVG");
+        svg.innerHTML = ""; // Clear the SVG
+        drawLinesAndText();
+
+        const resultsDiv = document.getElementById("resultsPA");
+        resultsDiv.innerHTML = "";
+
+        const Difference = parseFloat(
+          document.getElementById("AngelDifference").value
+        );
+        const cosTolerance = Math.cos((Difference * Math.PI) / 180); // Compute cos of angle tolerance
+        const ResizeM = parseFloat(document.getElementById("ResizeM").value);
+        const eLimit = parseFloat(document.getElementById("eLimit").value);
+        const mLimit = parseFloat(document.getElementById("mLimit").value);
+        const showOutOfFilterGalaxies = document.getElementById(
+          "showOutOfFilterGalaxies"
+        ).checked;
+
+        // Функція для розрахунку відстані між двома точками
+        function distance(x1, y1, x2, y2) {
+          return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+
+        const processedPairs = new Set();
+
+        // Фільтруємо дані
+        const filteredData = data.filter(
+          (point) => point.E > eLimit && point.m > mLimit
+        );
+        const outOfFilterData = data.filter(
+          (point) => !(point.E > eLimit && point.m > mLimit)
+        );
+
+        // Проходимо по кожній точці
+        filteredData.forEach((point, index) => {
+          let minDistance = Infinity;
+          let closestPoint = null;
+
+          // Знаходимо найближчу точку до поточної
+          for (let i = 0; i < filteredData.length; i++) {
+            if (i !== index) {
+              const dist = distance(
+                point.x,
+                point.y,
+                filteredData[i].x,
+                filteredData[i].y
+              );
+              if (dist < minDistance) {
+                minDistance = dist;
+                closestPoint = filteredData[i];
+              }
+            }
+          }
+
+          if (closestPoint) {
+            // Унікальний ключ для пари точок
+            const pairKey = `${Math.min(point.i, closestPoint.i)}-${Math.max(
+              point.i,
+              closestPoint.i
+            )}`;
+
+            if (!processedPairs.has(pairKey)) {
+              // Обчислюємо кути
+              const angle1 = (point.PA * Math.PI) / 180; // Орієнтація першої точки в радіанах
+              const angle2 = (closestPoint.PA * Math.PI) / 180; // Орієнтація найближчої точки в радіанах
+
+              // Визначаємо косинус відхилення кута
+              const cosAngleDifference = Math.cos(angle1 - angle2);
+
+              // Перевіряємо чи косинус відхилення менше або рівне заданому значенню
+              if (cosAngleDifference >= cosTolerance) {
+                resultsDiv.innerHTML += `<br><b>Galaxy  # (${point.i})</b>: (${point.x}, ${point.y}), <br>
+            The nearest galaxy to it (<b># ${closestPoint.i})</b>: (${closestPoint.x}, ${closestPoint.y}), <br>
+            Orientation of the galaxy: ${point.PA}, <br>
+            Orientation of the nearest galaxy: ${closestPoint.PA} <br>
+            The cosine of the angle deviation: ${cosAngleDifference} <br>`;
+
+                const ellipse = createCircleViewe(
+                  point.i,
+                  point.x,
+                  point.y,
+                  point.m / 2 + ResizeM,
+                  point.E,
+                  point.PA,
+                  "black",
+                  "rgba(255,0,0, 0.5)",
+                  point.BG
+                );
+                const ellipse2 = createCircleViewe(
+                  closestPoint.i,
+                  closestPoint.x,
+                  closestPoint.y,
+                  closestPoint.m / 2 + ResizeM,
+                  closestPoint.E,
+                  closestPoint.PA,
+                  "black",
+                  "rgba(255,0,0, 0.5)",
+                  point.BG
+                );
+
+                const distantLine =
+                  document.getElementById("distantLine").checked;
+                if (distantLine) {
+                  const line = document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "line"
+                  );
+                  line.setAttribute("x1", point.x);
+                  line.setAttribute("y1", point.y);
+                  line.setAttribute("x2", closestPoint.x);
+                  line.setAttribute("y2", closestPoint.y);
+                  line.setAttribute("stroke", "blue");
+                  line.setAttribute("stroke-width", "2");
+                  svg.appendChild(line);
+                }
+
+                const directionLine =
+                  document.getElementById("directionLine").checked;
+                if (directionLine) {
+                  const directionLine = document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "line"
+                  );
+                  const lineLength = 15 + point.m / 2; // Length of the direction line
+                  const startX =
+                    point.x -
+                    lineLength * Math.cos(((point.PA + 90) * Math.PI) / 180);
+                  const startY =
+                    point.y -
+                    lineLength * Math.sin(((point.PA + 90) * Math.PI) / 180);
+                  const endX =
+                    point.x +
+                    lineLength * Math.cos(((point.PA + 90) * Math.PI) / 180);
+                  const endY =
+                    point.y +
+                    lineLength * Math.sin(((point.PA + 90) * Math.PI) / 180);
+                  directionLine.setAttribute("x1", startX);
+                  directionLine.setAttribute("y1", startY);
+                  directionLine.setAttribute("x2", endX);
+                  directionLine.setAttribute("y2", endY);
+                  directionLine.setAttribute("stroke", "rgba(0,0,0,0.9)");
+                  directionLine.setAttribute("stroke-width", "2");
+                  directionLine.setAttribute("stroke-dasharray", "1,5");
+                  directionLine.setAttribute("stroke-linecap", "round");
+                  svg.appendChild(directionLine);
+
+                  const directionLine2 = document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "line"
+                  );
+                  const startX2 =
+                    closestPoint.x -
+                    lineLength *
+                      Math.cos(((closestPoint.PA + 90) * Math.PI) / 180);
+                  const startY2 =
+                    closestPoint.y -
+                    lineLength *
+                      Math.sin(((closestPoint.PA + 90) * Math.PI) / 180);
+                  const endX2 =
+                    closestPoint.x +
+                    lineLength *
+                      Math.cos(((closestPoint.PA + 90) * Math.PI) / 180);
+                  const endY2 =
+                    closestPoint.y +
+                    lineLength *
+                      Math.sin(((closestPoint.PA + 90) * Math.PI) / 180);
+                  directionLine2.setAttribute("x1", startX2);
+                  directionLine2.setAttribute("y1", startY2);
+                  directionLine2.setAttribute("x2", endX2);
+                  directionLine2.setAttribute("y2", endY2);
+                  directionLine2.setAttribute("stroke", "rgba(0,0,0,0.9)");
+                  directionLine2.setAttribute("stroke-width", "2");
+                  directionLine2.setAttribute("stroke-dasharray", "1,5");
+                  directionLine2.setAttribute("stroke-linecap", "round");
+                  svg.appendChild(directionLine2);
+                }
+
+                svg.appendChild(ellipse);
+                svg.appendChild(ellipse2);
+
+                // Додаємо оброблену пару точок до набору
+                processedPairs.add(pairKey);
+              }
+            }
+          }
+        });
+
+        const ShowAllGalaxies =
+          document.getElementById("ShowAllGalaxies").checked;
+        if (ShowAllGalaxies) {
+          filteredData.forEach((point) => {
+            const ellipse = createCircleViewe(
+              point.i,
+              point.x,
+              point.y,
+              point.m / 2 + ResizeM,
+              point.E,
+              point.PA,
+              "black",
+              "rgba(0,0,0, 0.1)",
+              point.BG
+            );
+            svg.appendChild(ellipse);
+          });
+        }
+
+        if (showOutOfFilterGalaxies) {
+          outOfFilterData.forEach((point) => {
+            const ellipse = createCircleViewe(
+              point.i,
+              point.x,
+              point.y,
+              point.m / 2 + ResizeM,
+              point.E,
+              point.PA,
+              "black",
+              "rgba(0,0,0, 0.1)",
+              point.BG
+            );
+            svg.appendChild(ellipse);
+          });
+        }
+
+        drawHistogramPA(getDataFromTable(), 12);
+      }
+
+      // Function to save SVG as BMP
+      function saveBMP() {
+        var svgElement = document.getElementById("mySVG");
+
+        const fileInput = document.getElementById("fileInput");
+        // Отримати вибраний файл
+        const file = fileInput.files[0];
+
+        // Отримати ім'я файлу без розширення
+        const fileName = file.name.replace(/\.[^/.]+$/, ""); // Видаляємо останнє збігання крапки і тексту за нею до кінця рядка
+
+        const text = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        text.setAttribute("x", 440); // Adjust x coordinate by subtracting 420
+        text.setAttribute("y", 60);
+        text.setAttribute("font-size", 18);
+        text.setAttribute("font-family", "Arial");
+        text.setAttribute("text-anchor", "start"); // Set text alignment
+        text.textContent = fileName;
+
+        svgElement.appendChild(text);
+        var svgString = new XMLSerializer().serializeToString(svgElement);
+
+        // Create a canvas element and set its dimensions to match the SVG
+        var canvas = document.createElement("canvas");
+        canvas.width = svgElement.clientWidth;
+        canvas.height = svgElement.clientHeight;
+        var ctx = canvas.getContext("2d");
+
+        var DOMURL = window.URL || window.webkitURL || window;
+        var img = new Image();
+        var svgBlob = new Blob([svgString], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+        var url = DOMURL.createObjectURL(svgBlob);
+
+        img.onload = function () {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          DOMURL.revokeObjectURL(url);
+
+          var imgURI = canvas
+            .toDataURL("image/bmp")
+            .replace("image/bmp", "image/octet-stream");
+
+          var evt = new MouseEvent("click", {
+            view: window,
+            bubbles: false,
+            cancelable: true,
+          });
+
+          var a = document.createElement("a");
+          a.setAttribute("download", fileName + ".bmp");
+          a.setAttribute("href", imgURI);
+          a.setAttribute("target", "_blank");
+
+          a.dispatchEvent(evt);
+        };
+
+        img.src = url;
+      }
+
+      // Function to save SVG as BMP
+      function histogramSVGsaveBMP() {
+        var svgElement = document.getElementById("histogramSVG");
+
+        const fileInput = document.getElementById("fileInput");
+        // Отримати вибраний файл
+        const file = fileInput.files[0];
+
+        // Отримати ім'я файлу без розширення
+        const fileName = file.name.replace(/\.[^/.]+$/, ""); // Видаляємо останнє збігання крапки і тексту за нею до кінця рядка
+
+        const text = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        text.setAttribute("x", 440); // Adjust x coordinate by subtracting 420
+        text.setAttribute("y", 60);
+        text.setAttribute("font-size", 18);
+        text.setAttribute("font-family", "Arial");
+        text.setAttribute("text-anchor", "start"); // Set text alignment
+        text.textContent = fileName;
+
+        svgElement.appendChild(text);
+
+        var svgString = new XMLSerializer().serializeToString(svgElement);
+
+        // Create a canvas element and set its dimensions to match the SVG
+        var canvas = document.createElement("canvas");
+        canvas.width = svgElement.clientWidth;
+        canvas.height = svgElement.clientHeight;
+        var ctx = canvas.getContext("2d");
+
+        var DOMURL = window.URL || window.webkitURL || window;
+        var img = new Image();
+        var svgBlob = new Blob([svgString], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+        var url = DOMURL.createObjectURL(svgBlob);
+
+        img.onload = function () {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          DOMURL.revokeObjectURL(url);
+
+          var imgURI = canvas
+            .toDataURL("image/bmp")
+            .replace("image/bmp", "image/octet-stream");
+
+          var evt = new MouseEvent("click", {
+            view: window,
+            bubbles: false,
+            cancelable: true,
+          });
+          const fileInput = document.getElementById("fileInput");
+          // Отримати вибраний файл
+          const file = fileInput.files[0];
+
+          // Отримати ім'я файлу без розширення
+          const fileName = file.name.replace(/\.[^/.]+$/, ""); // Видаляємо останнє збігання крапки і тексту за нею до кінця рядка
+
+          //console.log("Назва файлу без розширення:", fileName);
+
+          var a = document.createElement("a");
+          a.setAttribute("download", "D.H. - " + fileName + ".bmp");
+          a.setAttribute("href", imgURI);
+          a.setAttribute("target", "_blank");
+
+          a.dispatchEvent(evt);
+        };
+
+        img.src = url;
+      }
+
+      function drawEllipses() {
+        var svg = document.getElementById("mySVG");
+        var table = document.getElementById("editableTable");
+
+        svg.innerHTML = ""; // Clear the SVG
+        drawLinesAndText();
+        const data = getDataFromTable();
+data.forEach((point, index) => {
+const ellipse = createCircleViewe(
+                  point.i,
+                  point.x,
+                  point.y,
+                  point.m/2,
+                  point.E,
+                  point.PA,
+                  `rgba(${point.BG*25 + 0},${point.BG*25 + 0},${point.BG*25 + 0}, ${point.BG*1 + 0.4})`,
+                  `rgba(${point.BG*25 + 0},${point.BG*25 + 0},${point.BG*25 + 0}, ${point.BG*1 + 0.4})`,
+                  point.BG
+                );//`rotate(${angle + 90}, ${x}, ${y})`
+          svg.appendChild(ellipse);
+});
+
+/*
+        for (var i = 1; i < table.rows.length; i++) {
+          var x =
+            parseFloat(table.rows[i].cells[1].innerHTML.replace(",", ".")) / 8 +
+            250 +
+            65;
+          var y =
+            -parseFloat(table.rows[i].cells[2].innerHTML.replace(",", ".")) /
+              8 +
+            250 +
+            10; // --------------------------
+          var radius = Number(
+            parseFloat(table.rows[i].cells[3].innerHTML.replace(",", "."))
+          );
+          //var m = 0.6 * (18.5 - radius);
+          //radius = 3 * Math.pow(2, m) + 6;
+          radius /= 2;
+          var ellipticity = Number(
+            parseFloat(table.rows[i].cells[4].innerHTML.replace(",", "."))
+          );
+          var angle = parseFloat(
+            table.rows[i].cells[5].innerHTML.replace(",", ".")
+          );
+          var A =
+            radius /
+            Math.pow(1 - 2 * ellipticity + ellipticity * ellipticity, 1 / 4);
+          var B = (radius * radius) / A;
+
+          var ellipse = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "ellipse"
+          );
+          ellipse.setAttribute("cx", x);
+          ellipse.setAttribute("cy", y);
+          ellipse.setAttribute("rx", A);
+          ellipse.setAttribute("ry", B);
+          ellipse.setAttribute("fill", "rgba(0,0,0,0.4)");
+          ellipse.setAttribute("stroke", "black");
+          ellipse.setAttribute(
+            "transform",
+            `rotate(${angle + 90}, ${x}, ${y})`
+          );
+          ellipse.setAttribute("data-row-index", i);
+
+          // Add event listener to display tooltip when mouse hovers over ellipse
+          ellipse.addEventListener(
+            "mouseover",
+            (function (x, y, radius, ellipticity, angle) {
+              return function (event) {
+                this.setAttribute("stroke", "red");
+                this.setAttribute("stroke-width", "2");
+                var tooltip = document.getElementById("tooltip");
+                tooltip.style.display = "block";
+                tooltip.style.left = event.pageX + "px";
+                tooltip.style.top = event.pageY + "px";
+                tooltip.innerHTML = `x: ${(x - 250 - 65) * 8}, y: ${
+                  (y - 250 - 10) * -8
+                }, size: ${
+                  radius * 2
+                }, ellipticity: ${ellipticity}, angle: ${angle}`;
+              };
+            })(x, y, radius, ellipticity, angle)
+          );
+
+          // Remove tooltip and highlighting when mouse leaves ellipse
+          ellipse.addEventListener("mouseout", function () {
+            this.setAttribute("stroke", "black");
+            this.setAttribute("stroke-width", "1");
+            var tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+          });
+
+          // Add event listener to highlight table row when ellipse is clicked
+          ellipse.addEventListener("click", function () {
+            // Remove highlight from any previously highlighted row
+            var highlightedRow = document.querySelector(".highlight");
+            if (highlightedRow) {
+              highlightedRow.classList.remove("highlight");
+            }
+
+            // Remove highlight from any previously highlighted ellipse
+            var highlightedEllipse =
+              document.querySelector(".highlight-ellipse");
+            if (highlightedEllipse) {
+              highlightedEllipse.classList.remove("highlight-ellipse");
+              highlightedEllipse.setAttribute("stroke", "black");
+              highlightedEllipse.setAttribute("stroke-width", "1");
+            }
+
+            // Highlight the corresponding row in the table
+            var rowIndex = this.getAttribute("data-row-index");
+            table.rows[rowIndex].classList.add("highlight");
+
+    // Highlight the corresponding row in the table
+    var rowIndex = this.getAttribute("data-row-index");
+    var selectedRow = table.rows[rowIndex];
+ 
+    if (selectedRow) {
+        selectedRow.classList.add("highlight");
+    }
+       var highlightedRow = document.querySelector('.highlight');
+     // Scroll the table to the highlighted row
+     //console.log(highlightedRow);
+                highlightedRow.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest"
+        });
+
+
+
+
+            // Highlight the corresponding ellipse
+            this.classList.add("highlight-ellipse");
+            this.setAttribute("stroke", "red");
+            this.setAttribute("stroke-width", "2");
+          });
+
+          svg.appendChild(ellipse);
+        }
+*/
+        // Add event listener to highlight ellipse when table row is clicked
+        Array.from(table.rows).forEach((row, index) => {
+          row.addEventListener("click", function () {
+            // Remove highlight from any previously highlighted ellipse
+            var highlightedEllipse =
+              document.querySelector(".highlight-ellipse");
+            if (highlightedEllipse) {
+              highlightedEllipse.classList.remove("highlight-ellipse");
+              highlightedEllipse.setAttribute("stroke", "black");
+              highlightedEllipse.setAttribute("stroke-width", "1");
+            }
+
+            // Remove highlight from any previously highlighted row
+            var highlightedRow = document.querySelector(".highlight");
+            if (highlightedRow) {
+              highlightedRow.classList.remove("highlight");
+            }
+
+            // Highlight the corresponding ellipse
+            var ellipse = svg.querySelector(
+              `ellipse[data-row-index="${index}"]`
+            );
+            if (ellipse) {
+              ellipse.classList.add("highlight-ellipse");
+              ellipse.setAttribute("stroke", "red");
+              ellipse.setAttribute("stroke-width", "2");
+            }
+
+            // Highlight the clicked row
+            this.classList.add("highlight");
+
+
+            
+          });
+        });
+        
+      }
+
+      function analyzeBinggeliEffect(data) {
+        var svg = document.getElementById("mySVG");
+        svg.innerHTML = ""; // Очистити SVG
+        drawLinesAndText(); // Функція для відображення сітки та тексту
+
+        const resultsDiv = document.getElementById("resultsBinggeli");
+        resultsDiv.innerHTML = "";
+
+        const ResizeM = parseFloat(
+          document.getElementById("BinggeliResizeM").value
+        );
+        const eLimit = parseFloat(
+          document.getElementById("BinggelieLimit").value
+        );
+        const mLimit = parseFloat(
+          document.getElementById("BinggelimLimit").value
+        );
+        const angleTolerance =
+          parseFloat(document.getElementById("AngleTolerance").value) || 10; // Додана змінна для допустимого відхилення кута
+        const showOutOfFilterGalaxies = document.getElementById(
+          "BinggelishowOutOfFilterGalaxies"
+        ).checked;
+const countBins = parseFloat(
+          document.getElementById("BinggeCountBins").value
+        );
+        // Функція для розрахунку відстані між двома точками
+        function distance(x1, y1, x2, y2) {
+          return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+
+        const processedPairs = new Set();
+
+         const cosTetaValues = [];
+
+        // Фільтруємо дані
+        const filteredData = data.filter(
+          (point) => point.E > eLimit && point.m > mLimit
+        );
+        const outOfFilterData = data.filter(
+          (point) => !(point.E > eLimit && point.m > mLimit)
+        );
+
+        // Проходимо по кожній точці
+        filteredData.forEach((point, index) => {
+          let minDistance = Infinity;
+          let closestPoint = null;
+
+          // Знаходимо найближчу точку до поточної
+          for (let i = 0; i < filteredData.length; i++) {
+            if (i !== index) {
+              const dist = distance(
+                point.x,
+                point.y,
+                filteredData[i].x,
+                filteredData[i].y
+              );
+              if (dist < minDistance) {
+                minDistance = dist;
+                closestPoint = filteredData[i];
+              }
+            }
+          }
+
+          if (closestPoint) {
+            // Унікальний ключ для пари точок
+            const pairKey = `${Math.min(point.i, closestPoint.i)}-${Math.max(
+              point.i,
+              closestPoint.i
+            )}`;
+
+            if (!processedPairs.has(pairKey)) {
+              // Обчислюємо напрямок на сусіда
+              const deltaX =
+                (closestPoint.x - 250 - 65) * 8 - (point.x - 250 - 65) * 8;
+              const deltaY =
+                (closestPoint.y - 250 - 10) * -8 - (point.y - 250 - 10) * -8;
+              const directionAngle = Math.sqrt(
+                Math.pow(deltaX, 2) + Math.pow(deltaY, 2)
+              ); //Math.atan2(deltaY, deltaX); // * (180 / Math.PI); // Кут напряму на сусіда в градусах
+              const directionRad = Math.acos(deltaY / directionAngle);
+              const pointPARad = (point.PA * Math.PI) / 180;
+              const cosTeta = Math.abs(
+                Math.cos(pointPARad) * Math.cos(directionRad) +
+                  Math.sin(pointPARad) * Math.sin(directionRad)
+              );
+
+              // Обчислюємо різницю між орієнтацією галактики і напрямком на сусіда
+              const angleDifference = Math.abs(
+                point.PA - directionRad * (180 / Math.PI)
+              );
+              const adjustedAngleDifference =
+                Math.acos(cosTeta) * (180 / Math.PI);
+ 
+              // Перевіряємо, чи різниця кута менша за допустиме відхилення
+              if (adjustedAngleDifference <= angleTolerance) {
+                 cosTetaValues.push(cosTeta);
+                resultsDiv.innerHTML += `<br><b>Galaxy  # (${point.i})</b>: (${
+                  (point.x - 250 - 65) * 8
+                }, ${(point.y - 250 - 10) * -8}), <br>
+                          The nearest galaxy to it (<b># ${
+                            closestPoint.i
+                          }</b>): (${(closestPoint.x - 250 - 65) * 8}, ${
+                  (closestPoint.y - 250 - 10) * -8
+                }), <br>
+                          Direction angle: ${(
+                            directionRad *
+                            (180 / Math.PI)
+                          ).toFixed(2)}°, <br>
+                          Orientation of the galaxy: ${point.PA}°, <br>
+                          Orientation of the nearest galaxy: ${
+                            closestPoint.PA
+                          }°, <br>
+                          Cos(θ): ${cosTeta.toFixed(2)} rad,  <br>
+                          Angle Difference (θ): ${adjustedAngleDifference.toFixed(
+                            2
+                          )}° <br>`;
+
+                // Візуалізуємо еліпси
+                const ellipse = createCircleViewe(
+                  point.i,
+                  point.x,
+                  point.y,
+                  point.m / 2 + ResizeM,
+                  point.E,
+                  point.PA,
+                  "black",
+                  `rgba(${0},${255},${0}, ${ 0.5})`,
+                  point.BG
+                );//`rgba(${point.BG*25 + 0},${point.BG*25 + 0},${point.BG*25 + 0}, ${point.BG*1 + 0.4})`
+                const ellipse2 = createCircleViewe(
+                  closestPoint.i,
+                  closestPoint.x,
+                  closestPoint.y,
+                  closestPoint.m / 2 + ResizeM,
+                  closestPoint.E,
+                  closestPoint.PA,
+                  "black",
+                  `rgba(${0},${255},${0}, ${ 0.5})`,
+                  point.BG
+                );
+
+                svg.appendChild(ellipse);
+                svg.appendChild(ellipse2);
+                // Візуалізуємо лінію, що вказує напрямок
+                const line = document.createElementNS(
+                  "http://www.w3.org/2000/svg",
+                  "line"
+                );
+                line.setAttribute("x1", point.x);
+                line.setAttribute("y1", point.y);
+                line.setAttribute("x2", closestPoint.x);
+                line.setAttribute("y2", closestPoint.y);
+                line.setAttribute("stroke", "red");
+                line.setAttribute("stroke-width", "2");
+                svg.appendChild(line);
+              }
+
+              // Додаємо оброблену пару точок до набору
+              processedPairs.add(pairKey);
+            }
+          }
+        });
+
+        const ShowAllGalaxies = document.getElementById(
+          "BinggeShowAllGalaxies"
+        ).checked;
+        if (ShowAllGalaxies) {
+          filteredData.forEach((point) => {
+            const ellipse = createCircleViewe(
+              point.i,
+              point.x,
+              point.y,
+              point.m / 2 + ResizeM,
+              point.E,
+              point.PA,
+              "black",
+`rgba(${0},${0},${0}, ${0.1})`,
+point.BG
+            );
+            svg.appendChild(ellipse);
+          });
+        }
+
+        if (showOutOfFilterGalaxies) {
+          outOfFilterData.forEach((point) => {
+            const ellipse = createCircleViewe(
+              point.i,
+              point.x,
+              point.y,
+              point.m / 2 + ResizeM,
+              point.E,
+              point.PA,
+              "black",
+              `rgba(${0},${0},${0}, ${0.1})`,
+              point.BG
+            );
+            svg.appendChild(ellipse);
+          });
+        }
+        drawHistogramBinggeli(cosTetaValues, countBins);
+      }
+
+      function drawHistogramBinggeli(cosTetaValues, numBins) {
+    const svg = document.getElementById("histogramSVG");
+    svg.innerHTML = "";
+
+    const width = 575;
+    const height = 545;
+    const margin = 55;
+
+    // Розподіл значень cosTeta на біни
+    const binWidth = 1 / numBins; // Діапазон [0, 1] розділений на кількість бін
+    const bins = new Array(numBins).fill(0);
+
+    cosTetaValues.forEach((value) => {
+        const binIndex = Math.floor(value / binWidth);
+        if (binIndex >= 0 && binIndex < numBins) {
+            bins[binIndex]++;
+        }
+    });
+
+    // Масштабування значень бінів
+    const totalGalaxies = cosTetaValues.length;
+    const barWidth = (width - margin * 2) / numBins;
+    const maxBinValue = 0.5;
+
+    // Створення осей X і Y
+    const xAxis = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    xAxis.setAttribute("x1", margin);
+    xAxis.setAttribute("y1", height - margin);
+    xAxis.setAttribute("x2", width - margin);
+    xAxis.setAttribute("y2", height - margin);
+    xAxis.setAttribute("stroke-width", "2");
+    xAxis.setAttribute("stroke", "black");
+    svg.appendChild(xAxis);
+
+    const yAxis = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    yAxis.setAttribute("x1", margin);
+    yAxis.setAttribute("y1", margin);
+    yAxis.setAttribute("x2", margin);
+    yAxis.setAttribute("y2", height - margin);
+    yAxis.setAttribute("stroke-width", "2");
+    yAxis.setAttribute("stroke", "black");
+    svg.appendChild(yAxis);
+
+    const yScale = maxBinValue > 0 ? (height - 2 * margin) / maxBinValue : 0;
+
+
+// Додавання підписів осі Y, тік та сітки
+    const yAxisSteps = 5;
+    for (let i = 0; i < yAxisSteps; i++) {
+        const y = height - margin - ((height - margin * 2) / yAxisSteps) * i;
+        const relativeFrequency = (i * 0.1).toFixed(2);
+
+        // Підписи
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", margin - 10);
+        text.setAttribute("y", y + 3);
+        text.setAttribute("text-anchor", "end");
+        text.setAttribute("font-size", "18");
+        text.setAttribute("font-family", "Arial");
+        text.textContent = relativeFrequency;
+        svg.appendChild(text);
+
+        // Тіки
+        const tick = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        tick.setAttribute("x1", margin - 5);
+        tick.setAttribute("y1", y);
+        tick.setAttribute("x2", margin);
+        tick.setAttribute("y2", y);
+        tick.setAttribute("stroke", "black");
+        svg.appendChild(tick);
+
+        // Сітка
+        const gridLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        gridLine.setAttribute("x1", margin);
+        gridLine.setAttribute("y1", y);
+        gridLine.setAttribute("x2", width - margin);
+        gridLine.setAttribute("y2", y);
+        gridLine.setAttribute("stroke", "lightgray");
+        gridLine.setAttribute("stroke-dasharray", "2,2");
+        svg.appendChild(gridLine);
+    }
+
+
+    // Додавання стовпців гістограми
+    bins.forEach((binValue, index) => {
+        const rectHeight = (binValue / totalGalaxies) * yScale;
+
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", margin + index * barWidth);
+        rect.setAttribute("y", height - margin - rectHeight);
+        rect.setAttribute("width", barWidth); // Ширина стовпців з проміжком
+        rect.setAttribute("height", rectHeight);
+        rect.setAttribute("fill", "#ccc");
+        rect.setAttribute("stroke", "#000");
+
+        // Tooltip (title attribute)
+        rect.setAttribute("title", `f: ${(binValue / totalGalaxies).toFixed(3)}`);
+
+        // Mouseover event listener for tooltip
+        rect.addEventListener("mouseover", (event) => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.textContent = `f: ${(binValue / totalGalaxies).toFixed(3)}`;
+            tooltip.style.display = "block";
+            tooltip.style.top = `${event.clientY}px`;
+            tooltip.style.left = `${event.clientX}px`;
+            rect.setAttribute("fill", "gray");
+        });
+
+        // Mouseout event listener to hide tooltip
+        rect.addEventListener("mouseout", () => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+            rect.setAttribute("fill", "#ccc");
+        });
+
+        svg.appendChild(rect);
+    });
+
+    // Додавання підписів осі X та тік
+    for (let i = 0; i <= numBins; i++) {
+        const x = margin + i * barWidth;
+
+        // Підписи
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", x);
+        text.setAttribute("y", height - margin + 25);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("font-size", "18");
+        text.setAttribute("font-family", "Arial");
+        //if (i % 2 == 0) 
+        if(numBins<10)
+        text.textContent = (i * binWidth).toFixed(2);
+      else if(numBins==10) text.textContent = (i * binWidth).toFixed(1);  else if (i % 2 == 0) text.textContent = (i * binWidth).toFixed(3);
+        svg.appendChild(text);
+
+        // Тіки
+        const tick = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        tick.setAttribute("x1", x);
+        tick.setAttribute("y1", height - margin);
+        tick.setAttribute("x2", x);
+        tick.setAttribute("y2", height - margin + 5);
+        tick.setAttribute("stroke", "black");
+        svg.appendChild(tick);
+    }
+
+    
+
+    // Додавання підписів осей
+    const xAxisLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    xAxisLabel.setAttribute("x", width / 2);
+    xAxisLabel.setAttribute("y", height - margin / 2 + 20);
+    xAxisLabel.setAttribute("text-anchor", "middle");
+    xAxisLabel.setAttribute("font-size", "22");
+    xAxisLabel.setAttribute("font-family", "Arial");
+    xAxisLabel.setAttribute("style", "font-weight: bold; font-style: italic;");
+    xAxisLabel.textContent = "cos(θ)";
+    svg.appendChild(xAxisLabel);
+
+    const yAxisLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    yAxisLabel.setAttribute("x", margin - 25);
+    yAxisLabel.setAttribute("y", margin + 30);
+    yAxisLabel.setAttribute("text-anchor", "middle");
+    yAxisLabel.setAttribute("font-size", "22");
+    yAxisLabel.setAttribute("font-family", "Arial");
+    yAxisLabel.setAttribute("style", "font-weight: bold; font-style: italic;");
+    yAxisLabel.textContent = "f";
+    svg.appendChild(yAxisLabel);
+
+    // Tooltip element
+    const tooltip = document.createElement("div");
+    tooltip.setAttribute("id", "tooltip");
+    tooltip.style.position = "absolute";
+    tooltip.style.display = "none";
+    tooltip.style.background = "rgba(0, 0, 0, 0.7)";
+    tooltip.style.color = "#fff";
+    tooltip.style.padding = "5px";
+    document.body.appendChild(tooltip);
+}
+
+
+   </script>
+  </body>
+</html>
