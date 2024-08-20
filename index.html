@@ -362,6 +362,58 @@
         background-color: #f5f5f5;
         opacity: 1;
       }
+.modal {
+            display: none; /* Сховати модальне вікно за замовчуванням */
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            padding: 8px 0;
+        }
+
+        li a {
+            text-decoration: none;
+            color: blue;
+            cursor: pointer;
+        }
+
+        li a:hover {
+            text-decoration: underline;
+        }
 
       @media (max-width: 800px) {
         header {
@@ -441,10 +493,12 @@
         <button onclick="handleFile()">Load Data</button>
       </div>
       <div class="header-buttons">
+         <button id="openModalBtn">Download from BD</button>
         <button onclick="drawEllipses()">CreateMap</button>
         <button onclick="saveBMP()">Save Map</button>
         <button onclick="histogramSVGsaveBMP()">Save D.H.</button>
       </div>
+
     </header>
 
     <main>
@@ -905,6 +959,12 @@
     <div id="tooltip" class="tooltip"></div>
 
     <script>
+
+document.getElementById("openModalBtn").addEventListener("click", function() {
+    const url = "https://drive.google.com/drive/folders/1rKwWbXewsDwUV3_4q--JEZ3zSN1yFPaW?usp=sharing";
+    window.open(url, "_blank"); // Відкриває посилання в новій вкладці
+});
+
       function toggleHeaderContent() {
         document.querySelector("header").classList.toggle("show-content");
         document.querySelector("main").classList.toggle("show-overlay");
@@ -1963,10 +2023,10 @@
           var radius = calculateClusterRadius();
           var ringWidth = document.getElementById("ringWith").value;
           var ringDistance = radius * ringWidth;
-          var numRings = Math.ceil(radius / ringDistance);
+          var numRings = (radius / ringDistance).toFixed(2);
 
           document.getElementById("Radius").value = radius;
-          document.getElementById("ringDistance").value = ringDistance;
+          document.getElementById("ringDistance").value = ringDistance.toFixed(2);
           document.getElementById("numRings").value = numRings;
           document.getElementById("centerX").value = 0;
           document.getElementById("centerY").value = 0;
@@ -2151,12 +2211,8 @@ if (svg2) {
       }
 
       function analyzeConcentration() {
-        document.getElementById("ringDistance").value =
-          document.getElementById("Radius").value *
-          document.getElementById("ringWith").value;
-        document.getElementById("numRings").value = //Math.ceil(
-          document.getElementById("Radius").value /
-          document.getElementById("ringDistance").value;
+ 
+
         //);
 
         // drawEllipsesRings();
