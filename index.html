@@ -2213,7 +2213,12 @@ if (svg2) {
       }
 
       function analyzeConcentration() {
- 
+        document.getElementById("ringDistance").value =
+          document.getElementById("Radius").value *
+          document.getElementById("ringWith").value;
+        document.getElementById("numRings").value = //Math.ceil(
+          document.getElementById("Radius").value /
+          document.getElementById("ringDistance").value;
 
         //);
 
