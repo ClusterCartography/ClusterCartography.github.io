@@ -95,6 +95,17 @@
         background-color: white;
         color: var(--primary-color);
       }
+      .logoText{
+    font-family: 'Arial', sans-serif;
+    font-weight: bold;
+    font-size: 28px;
+    display: flex;
+        align-items: center;
+    color: white;
+        margin-right: 30px;
+    margin-left: 10px;
+}
+
 
       main {
         display: flex;
@@ -415,7 +426,7 @@
             text-decoration: underline;
         }
 
-      @media (max-width: 800px) {
+      @media (max-width: 1200px) {
         header {
           flex-wrap: wrap;
           height: auto;
@@ -488,6 +499,7 @@
         <div></div>
         <div></div>
       </div>
+    <span class="logoText">Cluster Cartography</span>
       <div class="header-content">
         <input type="file" id="fileInput" accept=".txt" />
         <button onclick="handleFile()">Load Data</button>
