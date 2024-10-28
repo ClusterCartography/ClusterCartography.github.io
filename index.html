@@ -481,7 +481,7 @@
       }
     </style>
   </head>
-  <body>
+  <body onload="createEditableTable(150, 7)">
     <header>
       <div class="hamburger" onclick="toggleHeaderContent()">
         <div></div>
@@ -533,6 +533,7 @@
             <!-- Table content will be generated here using JavaScript -->
           </tbody>
         </table>
+      
       </aside>
 
       <content>
@@ -770,7 +771,16 @@
             >
             <input type="checkbox" id="excludeStripCenter" />
           </div>
-
+<div class="text-field">
+    <label class="text-field__label">
+        <input type="radio" name="chartType" value="histogram" checked>
+        Angle Histogram
+    </label>
+    <label class="text-field__label">
+        <input type="radio" name="chartType" value="polar">
+        Polar Density Chart
+    </label>
+</div>
           <button onclick="analyzeCentralStrip()">
             Lighthouse beam analysis (y>0)
           </button>
@@ -1221,7 +1231,15 @@ document.getElementById("openModalBtn").addEventListener("click", function() {
               <b>Variance:</b>&emsp;${variance.toFixed(4)}<br>
       <b>Standard Deviation (S):</b>&emsp;${standardDeviation.toFixed(4)}`;
 
-        drawAngleHistogram(angleCounts, 380);
+       const selectedChart = document.querySelector('input[name="chartType"]:checked').value;
+
+        if (selectedChart === "histogram") {
+            drawAngleHistogram(angleCounts, 380);
+        } else if (selectedChart === "polar") {
+            drawPolarDensityChart(angleCounts, 360);
+        }
+        //drawAngleHistogram(angleCounts, 380);
+        //drawPolarDensityChart(angleCounts, 360);
       }
 
       function drawAngleHistogram(angleCounts, numBins) {
@@ -1426,6 +1444,131 @@ document.getElementById("openModalBtn").addEventListener("click", function() {
         yAxisLabel.textContent = "f'";
         svg.appendChild(yAxisLabel);
       }
+
+function drawPolarDensityChart(angleCounts, numBins) {
+    const svg = document.getElementById("histogramSVG");
+    svg.innerHTML = "";
+
+        const width = 600;
+        const height = 540;
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = 250; // Максимальний радіус ліній
+
+    // Отримати дані з таблиці та підрахувати загальну кількість
+    const data = getDataFromTable(); // Функція для отримання даних з таблиці
+    const totalGalaxies = data.length;
+    const densities = angleCounts.map((count) => count / totalGalaxies);
+    const maxDensity = Math.max(...densities);
+
+    // Кількість градусів між лініями
+    const angleStep = 360 / numBins;
+
+    densities.forEach((density, index) => {
+        const angle = index * angleStep; // Кут у градусах
+        const lineLength = (density / maxDensity) * radius; // Довжина лінії
+
+        // Обчислення кінцевих точок лінії в полярних координатах
+        const xEnd = centerX + lineLength * Math.cos(((angle - 90) * Math.PI) / 180);
+        const yEnd = centerY + lineLength * Math.sin(((angle - 90) * Math.PI) / 180);
+
+/*
+   const adjustedAngle = rotationAngle - 90; // Коригування кута для того, щоб 0 градусів був зверху
+          const angleInRadians = (adjustedAngle * Math.PI) / -180;
+          //const angleInRadians = ((rotationAngle * Math.PI) / -180);
+          //console.log(angleInRadians);
+          const startX = centerX - lineLength * Math.cos(angleInRadians);
+          const startY = centerY + lineLength * Math.sin(angleInRadians);
+          const endX = centerX + lineLength * Math.cos(angleInRadians);
+          const endY = centerY - lineLength * Math.sin(angleInRadians);
+
+*/
+
+
+        // Створення лінії
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", centerX);
+        line.setAttribute("y1", centerY);
+        line.setAttribute("x2", xEnd);
+        line.setAttribute("y2", yEnd);
+        line.setAttribute("stroke", "gray");
+        line.setAttribute("stroke-width", "2");
+
+        // Подія для відображення підказки з кутом і щільністю
+        line.addEventListener("mouseover", (event) => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.textContent = `α: ${angle.toFixed(1)}°, f': ${density.toFixed(4)}`;
+            tooltip.style.display = "block";
+            tooltip.style.top = `${event.clientY}px`;
+            tooltip.style.left = `${event.clientX}px`;
+            line.setAttribute("stroke", "black");
+        });
+
+        line.addEventListener("mouseout", () => {
+            const tooltip = document.getElementById("tooltip");
+            tooltip.style.display = "none";
+            line.setAttribute("stroke", "gray");
+        });
+
+        svg.appendChild(line);
+    });
+
+    // Створення кругових осей для щільності
+    const axisSteps = 5;
+    for (let i = 1; i <= axisSteps; i++) {
+        const r = (i / axisSteps) * radius;
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", centerX);
+        circle.setAttribute("cy", centerY);
+        circle.setAttribute("r", r);
+        circle.setAttribute("stroke", "lightgray");
+        circle.setAttribute("fill", "none");
+        circle.setAttribute("stroke-dasharray", "4,4");
+        svg.appendChild(circle);
+
+        // Додаємо значення щільності біля кожної осі
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", centerX);
+        text.setAttribute("y", centerY - r - 5);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("font-size", "12");
+        text.setAttribute("font-family", "Arial");
+        text.textContent = (maxDensity * (i / axisSteps)).toFixed(2);
+        svg.appendChild(text);
+    }
+
+    // Додаємо підписи осей
+    const xAxisLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    xAxisLabel.setAttribute("x", centerX);
+    xAxisLabel.setAttribute("y", centerY + radius + 20);
+    xAxisLabel.setAttribute("text-anchor", "middle");
+    xAxisLabel.setAttribute("font-size", "16");
+    xAxisLabel.setAttribute("font-family", "Arial");
+    xAxisLabel.textContent = "α (degrees)";
+    svg.appendChild(xAxisLabel);
+
+    const yAxisLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    yAxisLabel.setAttribute("x", centerX - radius - 30);
+    yAxisLabel.setAttribute("y", centerY);
+    yAxisLabel.setAttribute("text-anchor", "middle");
+    yAxisLabel.setAttribute("font-size", "16");
+    yAxisLabel.setAttribute("font-family", "Arial");
+    yAxisLabel.setAttribute("transform", `rotate(-90, ${centerX - radius - 30}, ${centerY})`);
+    yAxisLabel.textContent = "f'";
+    svg.appendChild(yAxisLabel);
+
+    // Tooltip для показу значень кута та щільності
+    const tooltip = document.createElement("div");
+    tooltip.setAttribute("id", "tooltip");
+    tooltip.style.position = "absolute";
+    tooltip.style.display = "none";
+    tooltip.style.background = "rgba(0, 0, 0, 0.7)";
+    tooltip.style.color = "#fff";
+    tooltip.style.padding = "5px";
+    document.body.appendChild(tooltip);
+}
+
 
       function drawDensityHistogram(data, numBins) {
         const svg = document.getElementById("histogramSVG");
