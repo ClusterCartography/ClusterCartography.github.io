@@ -374,31 +374,38 @@
         opacity: 1;
       }
 .modal {
-            display: none; /* Сховати модальне вікно за замовчуванням */
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.4);
-        }
+  display: none; /* Приховано за замовчуванням */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto; /* Дозволяє прокрутку вмісту, якщо він не поміщається */
+  background-color: rgba(0, 0, 0, 0.7); /* Фон затемнення */
+  z-index: 1000;
+}
 
-        .modal-content {
-            background-color: #fff;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-        }
+.modal-content {
+  background-color: rgba(255, 255, 255, .9);
+  margin: auto;
+  padding: 20px;
+  border-radius: 5px;
+  max-width: 90%;
+  max-height: 100%; /* Обмежує висоту модального вікна */
+  overflow-y: auto; /* Прокрутка по вертикалі для великого вмісту */
+  box-sizing: border-box;
+   position: relative;
+}
 
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
+.close {
+  position: absolute;
+  font-size: 44px;
+  color: dimgrey;
+  top: 8px;
+  right: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
 
         .close:hover,
         .close:focus {
@@ -509,9 +516,57 @@
         <button onclick="drawEllipses()">CreateMap</button>
         <button onclick="saveBMP()">Save Map</button>
         <button onclick="histogramSVGsaveBMP()">Save D.H.</button>
+        <button id="help">Help</button>
       </div>
 
     </header>
+
+<div id="myModal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h1>Cluster Cartography Guide</h1>
+    <p><strong>Cluster Cartography</strong> is an advanced tool for visualizing and analyzing the spatial distribution of galaxies within clusters. It facilitates various research methods, including examining galaxy concentrations, identifying filamentary structures, and observing peculiar features. The program also enables the estimation of the proportion of disk and elliptical galaxies in a cluster and analyzes the tendency of galaxies to align with their nearest neighbors.</p>
+    <h2>Main Functions:</h2>
+    <h3>1. Data Uploading:</h3>
+    <ul>
+      <li><strong>Choose a File</strong>: Select a file in “.txt” format.</li>
+      <li><strong>Load Data</strong>: Click "Load Data" to import data from the chosen file.</li>
+      <li><strong>File Format</strong>: The file should include:
+        <ul>
+          <li><code>X, Y</code>: Coordinates of the galaxy in arcseconds.</li>
+          <li><code>m'</code>: Adapted stellar magnitude, used to size the corresponding symbol.</li>
+          <li><code>E</code>: Ellipticity of the galaxy image, approximated by the best-fitting ellipse.</li>
+          <li><code>PA</code>: Position angle of the major axis of the ellipse, measured counterclockwise from north.</li>
+          <li><code>BG</code>: A column for assigning values from 1 to 9 for the brightest galaxies (0 by default in input files). If the source catalog lacks formation data, both <code>E</code> and <code>RA</code> should be set to 0.</li>
+        </ul>
+      </li>
+    </ul>
+    <p><strong>Sample Data</strong>: Click "Download from BD" to access a sample dataset.</p>
+    <h3>2. Data Visualization:</h3>
+    <p>After loading, the table on the left displays <code>X, Y</code> coordinates, adapted magnitude (<code>m'</code>), ellipticity (<code>E</code>), position angle (<code>PA</code>), and <code>BG</code> (default 0).</p>
+    <h3>3. Map Creation and Saving:</h3>
+    <ul>
+      <li><strong>CreateMap</strong>: Generates a cluster map, with each symbol’s size and orientation matching the input data. The map dimensions are 4000×4000 arcseconds.</li>
+      <li><strong>Save Map</strong>: Saves the map using the cluster name, based on the input file.</li>
+      <li><strong>Save D.H.</strong>: Click to save histograms.</li>
+    </ul>
+    <h3>4. Setting Cluster Parameters:</h3>
+    <p>The cluster radius is calculated automatically but can be manually adjusted. Default center coordinates (<code>X, Y</code>) are (0, 0) and can be customized.</p>
+    <h2>Key Analysis Modes:</h2>
+    <h3>C-I-O Analysis:</h3>
+    <p>Evaluates galaxy concentration toward the cluster center. The <code>Width</code> parameter determines the size of analysis zones as a fraction of the cluster radius, with the number of zones calculated automatically. Calculates the weighted density of galaxies in each zone, normalized to the total number of galaxies and the area of each zone.</p>
+    <h3>Line Analysis:</h3>
+    <p>Detects linear filamentary substructures in the cluster. Parameters include center coordinates, number of strips along the diameter, and rotation angle. Weighted density for each strip is normalized and displayed in a histogram. The "Exclude Center" option omits the cluster center from calculations, helpful for clusters with a significant central concentration.</p>
+    <h3>LHB (LightHouseBeam):</h3>
+    <p>Identifies specific substructures like crosses and half-crosses. The beam rotates in 1° increments, and density variations are displayed as linear or pie charts.</p>
+    <h3>Ellipticity Analysis (E):</h3>
+    <p>Creates a histogram of galaxy distribution based on ellipticity. Facilitates the division of clusters into E-rich and D-rich populations.</p>
+    <h3>Orientation Analysis:</h3>
+    <p>Compares galaxy alignments with their nearest neighbors. Galaxies are highlighted if the direction difference is below a specified <code>Angle Difference</code>.</p>
+    <h3>Binggeli Effect:</h3>
+    <p>Assesses alignment of galaxies with their nearest neighbors or perpendicularly. Filters for <code>E</code> and <code>m'</code> can be used to display specific subsets of galaxies.</p>
+  </div>
+</div>
 
     <main>
       <aside>
@@ -4553,7 +4608,19 @@ point.BG
     document.body.appendChild(tooltip);
 }
 
+document.getElementById('help').addEventListener('click', function() {
+  document.getElementById('myModal').style.display = 'block';
+});
 
+document.querySelector('.close').addEventListener('click', function() {
+  document.getElementById('myModal').style.display = 'none';
+});
+
+window.addEventListener('click', function(event) {
+  if (event.target === document.getElementById('myModal')) {
+    document.getElementById('myModal').style.display = 'none';
+  }
+});
    </script>
   </body>
 </html>
