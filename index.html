@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cluster Cartography</title>
+        <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
       :root {
         --primary-color: #3f4b59;
-        --secondary-color: #5e92bf;
+        /* --secondary-color: #5e92bf; */
         --accent-color: #d9c5b4;
         --background-color: #f4f4f4;
         --border-color: #a4a4a4;
@@ -73,7 +74,7 @@
       }
 
       header button,
-      header input {
+      header input  {
         padding: 8px 12px;
         border: none;
         border-radius: 4px;
@@ -160,10 +161,17 @@
       }
 
       #mySVG,
-      #histogramSVG {
+      #histogramSVG{
         border: 1px solid var(--border-color);
         margin: 10px 0;
         height: auto;
+      }
+           #plot3d {
+        width: 100%;
+        height: 80vh;
+        box-sizing: border-box;
+        border: 1px solid var(--border-color);
+        margin: 10px 0;
       }
 
       .highlight {
@@ -433,6 +441,87 @@
             text-decoration: underline;
         }
 
+ /* 3D plote */
+
+  .highlight-info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        max-width: 320px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        z-index: 10;
+      }
+      #controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 8px;
+        border-radius: 4px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        z-index: 10;
+      }
+
+      #refreshBtn, #btn_generateCluster {
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #ff9d00;
+        
+      }
+
+      #clusterModal { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:1000; }
+  .modal-backdrop {
+    position: absolute; inset:0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(2px);
+  }
+  .modal-content {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    min-width: 320px;
+    max-width: 420px;
+    box-shadow: 0 20px 60px -10px rgba(0,0,0,0.25);
+    font-family: system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    color: var(--primary-color);
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .fields { display: flex; gap: 12px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; flex:1; min-width: 120px; }
+  .field label { font-size: 12px; margin-bottom:4px; }
+  .field input { padding:6px 8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
+  .actions { margin-top:8px; display:flex; justify-content:flex-end; }
+#generateClusterBtn {
+  background: var(--primary-color);
+}
+#generateClusterBtn:hover {
+background: var(--accent-color)
+}
+
+
+
       @media (max-width: 1200px) {
         header {
           flex-wrap: wrap;
@@ -499,7 +588,7 @@
       }
     </style>
   </head>
-  <body onload="createEditableTable(150, 7)">
+  <body onload="createEditableTable(150, 8)">
     <header>
       <div class="hamburger" onclick="toggleHeaderContent()">
         <div></div>
@@ -517,6 +606,33 @@
         <button onclick="saveBMP()">Save Map</button>
         <button onclick="histogramSVGsaveBMP()">Save D.H.</button>
         <button id="help">Help</button>
+        <button id="refreshBtn">Create 3D Map</button>
+        <button id="btn_generateCluster">Generate Cluster</button>
+        <button id="saveTxtBtn">Save table (.txt)</button>
+<!-- Модал btn_generateCluster -->
+<div id="clusterModal" aria-hidden="true" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button class="close-btn" aria-label="Close">&times;</button>
+    <h2 id="modalTitle">Generate Synthetic Cluster</h2>
+    <div class="fields">
+      <div class="field">
+        <label for="clusterCount">Number of Galaxies:</label>
+        <input id="clusterCount" type="number" value="100" min="1" />
+      </div>
+      <div class="field">
+        <label for="sigma">Spread (σ):</label>
+        <input id="sigma" type="number" value="400" min="1" />
+      </div>
+    </div>
+    <div class="actions">
+      <button id="generateClusterBtn">Generate</button>
+    </div>
+  </div>
+</div>
+
+</div>
+      
       </div>
 
     </header>
@@ -594,13 +710,15 @@
               <th onclick="sortTable(6)">
                 BG <span class="sort-indicator"></span>
               </th>
+              <th style = "background-color: #ff9d00;" onclick="sortTable(7)">
+                Z <span class="sort-indicator"></span>
+              </th>
             </tr>
           </thead>
           <tbody>
             <!-- Table content will be generated here using JavaScript -->
           </tbody>
         </table>
-      
       </aside>
 
       <content>
@@ -614,6 +732,20 @@
           viewBox="0 0 575 545"
           preserveAspectRatio="xMidYMid meet"
         ></svg>
+            <div id="plot3d"></div>
+    <div id="info" class="highlight-info" style="display: none"></div>
+    <div id="controls">
+      <label>
+        # сусідів:
+        <input
+          type="number"
+          id="neighborCount"
+          value="10"
+          min="1"
+          style="width: 50px"
+        />
+      </label>
+    </div>
       </content>
       <nav class="show-shared-content">
         <ul class="tabs">
@@ -2214,7 +2346,7 @@ function drawPolarDensityChart(angleCounts, numBins) {
 
           // Create table with the number of rows equal to the number of lines in the file minus any empty lines at the end
           var nonEmptyLines = dataArray.filter((line) => line.trim() !== "");
-          createEditableTable(nonEmptyLines.length, 7); // Assuming 7 columns based on header
+          createEditableTable(nonEmptyLines.length, 8); // Assuming 7 columns based on header
 
           for (var i = 0; i < nonEmptyLines.length; i++) {
             var row = table.rows[i + 1]; // Adjust for header row
@@ -2377,12 +2509,17 @@ if (svg2) {
                           return circle;
                         }
                   */
+
       function getDataFromTable() {
         const data = [];
         const rows = document.querySelectorAll("#editableTable tr");
         rows.forEach((row, index) => {
           if (index === 0) return; // Пропустити заголовок таблиці
           const cells = row.querySelectorAll("td");
+            if (cells.length < 7) {
+      console.warn(`Пропускаю рядок ${index}: очікувалося ≥7 клітинок, є ${cells.length}`, row);
+      return;
+    }
           const i = parseFloat(cells[0].textContent);
           const x = parseFloat(cells[1].textContent) / 8 + 250 + 65;
           const y = parseFloat(cells[2].textContent) / -8 + 250 + 10;
@@ -2393,9 +2530,10 @@ if (svg2) {
           const BG = parseFloat(cells[6].textContent.replace(",", "."));
           data.push({ i, x, y, m, E, PA, BG });
         });
-
+console.log(data);
         return data;
       }
+
 
       function calculateClusterRadius() {
         const centerX =
@@ -4620,6 +4758,369 @@ window.addEventListener('click', function(event) {
   if (event.target === document.getElementById('myModal')) {
     document.getElementById('myModal').style.display = 'none';
   }
+});
+
+
+  // === 3D Конфігурація ===
+      let currentGalaxies = [];
+      let neighborCount = parseInt(
+        document.getElementById("neighborCount").value,
+        10
+      );
+
+      document
+        .getElementById("neighborCount")
+        .addEventListener("change", (e) => {
+          neighborCount = Math.max(1, parseInt(e.target.value, 10) || 10);
+        });
+
+      document.getElementById("refreshBtn").addEventListener("click", () => {
+        const galaxies = buildGalaxiesFromTable();
+        currentGalaxies = galaxies;
+        update3DPlot(galaxies);
+        document.getElementById("info").style.display = "none";
+      });
+
+
+            // ==== Функція побудови масиву галактик з таблиці ====
+      function getDataFromTable3d() {
+        const data = [];
+        const rows = document.querySelectorAll("#editableTable tr");
+        rows.forEach((row, index) => {
+          if (index === 0) return; // Пропустити заголовок
+          const cells = row.querySelectorAll("td");
+          if (cells.length < 7) return; // захист
+          const i = parseFloat(cells[0].textContent) || null;
+          const x_raw = parseFloat(cells[1].textContent) || 0;
+          const y_raw = parseFloat(cells[2].textContent) || 0;
+
+          const x = x_raw ;
+          const y = y_raw ;
+
+          // Z: якщо є (наприклад у майбутньому додаси), спробуй взяти, інакше випадкове
+          let z;
+          if (cells[7]) {
+            const zVal = parseFloat(cells[7].textContent);
+            if (!isNaN(zVal)) z = zVal;
+          }
+          if (z === undefined) {
+            // Генеруємо випадкове у тому ж масштабі, що і x,y
+            //z = (Math.random() - 0.5) * 4000;
+            z = 0 + randNormal(0, 500);
+
+cells[7].textContent = Math.round(z);
+
+          }
+
+          const m = parseFloat(cells[3].textContent.replace(",", ".")) || 0;
+          const E = parseFloat(cells[4].textContent.replace(",", ".")) || 0;
+          const PA = parseFloat(cells[5].textContent.replace(",", ".")) || 0;
+          const BG = parseFloat(cells[6].textContent.replace(",", ".")) || 0;
+
+          data.push({ i, x, y, z, m, E, PA, BG });
+        });
+        return data;
+      }
+
+
+      function buildGalaxiesFromTable() {
+        const raw = getDataFromTable3d();
+        // Приводимо до формату, який використовує візуалізація
+        return raw.map((g, idx) => ({
+          id: g.i != null ? `G${g.i}` : `G_auto_${idx}`,
+          name: `Galaxy ${g.i != null ? g.i : idx}`,
+          x: g.x,
+          y: g.y,
+          z: g.z,
+          // someProperty: наприклад, можна брати відстань від центру або еліптичність
+          someProperty: Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z),
+          // зберегти додаткові метрики для потенційного розширення
+          raw: { m: g.m, E: g.E, PA: g.PA, BG: g.BG },
+        }));
+      }
+
+      // ==== Візуалізація ====
+      function init3DPlot(galaxies) {
+        currentGalaxies = galaxies;
+        createOrUpdatePlot(galaxies, true);
+      }
+
+      function update3DPlot(galaxies) {
+        createOrUpdatePlot(galaxies, false);
+      }
+
+      function createOrUpdatePlot(galaxies, initial) {
+        const trace = {
+          x: galaxies.map((g) => g.x),
+          y: galaxies.map((g) => g.y),
+          z: galaxies.map((g) => g.z),
+          mode: "markers",
+          type: "scatter3d",
+          text: galaxies.map((g) => g.name),
+          hovertemplate:
+            "<b>%{text}</b><br>" +
+            "X: %{x:.2f}<br>Y: %{y:.2f}<br>Z: %{z:.2f}<extra></extra>",
+          marker: {
+            size: 4,
+            opacity: 0.8,
+            color: galaxies.map((g) => g.someProperty),
+            colorscale: "Viridis",
+            showscale: true,
+            colorbar: { title: "Distance" },
+          },
+          customdata: galaxies.map((g) => g.id),
+        };
+
+        // const layout = {
+        //   scene: {
+        //     xaxis: { title: "X", range: [-2000, 2000] },
+        //     yaxis: { title: "Y", range: [-2000, 2000] },
+        //     zaxis: { title: "Z", range: [-2000, 2000] },
+        //   },
+        //   margin: { l: 0, r: 0, b: 0, t: 0 },
+        //   hovermode: "closest",
+        // };
+        const layout = {
+  scene: {
+            xaxis: { title: "X", range: [-2000, 2000] },
+            yaxis: { title: "Y", range: [-2000, 2000] },
+            zaxis: { title: "Z", range: [-2000, 2000] },
+    aspectmode: 'cube', // рівні масштаби по осях
+    camera: {
+      eye: { x: 0, y: 0, z: 2 },    // звідки дивиться камера
+      center: { x: 0, y: 0, z: 0 },       // точка, на яку дивиться
+      up: { x: 0, y: 1, z: 0 }            // "вгору" для камери
+    }
+  },
+  margin: { l:0, r:0, b:0, t:0 },
+  hovermode: 'closest'
+};
+
+        const plot = document.getElementById("plot3d");
+        if (initial) {
+          Plotly.newPlot(plot, [trace], layout, { responsive: true });
+        } else {
+          Plotly.react(plot, [trace], layout);
+        }
+
+        attachInteraction(plot, galaxies);
+      }
+
+      function attachInteraction(plot, galaxies) {
+        // Очікується, що подія уже підписана тільки один раз; скидаємо старі, щоб уникнути дублювання
+        plot.removeAllListeners?.("plotly_click");
+        plot.removeAllListeners?.("plotly_clickoutside");
+
+        // plot.on("plotly_click", (eventData) => {
+        //   if (!eventData.points || !eventData.points.length) return;
+        //   const point = eventData.points[0];
+        //   const clickedId = point.customdata;
+        //   const clickedGalaxy = galaxies.find((g) => g.id === clickedId);
+        //   if (!clickedGalaxy) return;
+
+        //   const neighbors = findNearestNeighbors(
+        //     clickedGalaxy,
+        //     galaxies,
+        //     neighborCount
+        //   );
+
+        //   const colors = galaxies.map((g) => {
+        //     if (g.id === clickedId) return "red";
+        //     if (neighbors.some((n) => n.id === g.id)) return "orange";
+        //     return "rgba(100,100,200,0.5)";
+        //   });
+        //   const sizes = galaxies.map((g) =>
+        //     g.id === clickedId
+        //       ? 8
+        //       : neighbors.some((n) => n.id === g.id)
+        //       ? 6
+        //       : 4
+        //   );
+
+        //   Plotly.restyle(plot, {
+        //     "marker.color": [colors],
+        //     "marker.size": [sizes],
+        //   });
+
+        //   const infoDiv = document.getElementById("info");
+        //   infoDiv.style.display = "block";
+        //   infoDiv.innerHTML = `
+        //   <strong>Обрана галактика:</strong> ${clickedGalaxy.name} <br>
+        //   X=${clickedGalaxy.x.toFixed(2)}, Y=${clickedGalaxy.y.toFixed(
+        //     2
+        //   )}, Z=${clickedGalaxy.z.toFixed(2)}<br>
+        //   <strong>Найближчі ${neighbors.length} сусідів:</strong><br>
+        //   ${neighbors
+        //     .map(
+        //       (n) => `${n.name} (д/п=${distance(clickedGalaxy, n).toFixed(2)})`
+        //     )
+        //     .join("<br>")}
+        // `;
+        // });
+
+        plot.on("plotly_clickoutside", () => {
+          Plotly.restyle(plot, {
+            "marker.color": [galaxies.map((g) => g.someProperty)],
+            "marker.size": [galaxies.map((_) => 4)],
+          });
+          document.getElementById("info").style.display = "none";
+        });
+      }
+
+      // ==== Утиліти ====
+      function distance(a, b) {
+        return Math.sqrt(
+          (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2
+        );
+      }
+
+      function findNearestNeighbors(target, all, N) {
+        return all
+          .filter((g) => g.id !== target.id)
+          .map((g) => ({ ...g, d: distance(target, g) }))
+          .sort((a, b) => a.d - b.d)
+          .slice(0, N);
+      }
+
+      const trigger = document.getElementById('btn_generateCluster');
+  const modal = document.getElementById('clusterModal');
+  const closeBtn = modal.querySelector('.close-btn');
+  trigger.addEventListener('click', () => {
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    // фокус на першому інпуті
+    document.getElementById('clusterCount').focus();
+  });
+  closeBtn.addEventListener('click', hideModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal.querySelector('.modal-backdrop')) hideModal();
+  });
+  function hideModal() {
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  // Повторюємо генерацію (можеш підставити свою реалізацію)
+  function randNormal(mean = 0, sigma = 1) {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return mean + Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * sigma;
+  }
+
+  function ensureTableHeader() {
+    const table = document.getElementById('editableTable');
+    if (!table) return;
+    if (table.querySelector('thead')) return;
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+    ['i','X','Y','Z','m','E','PA','BG'].forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      tr.appendChild(th);
+    });
+    thead.appendChild(tr);
+    table.prepend(thead);
+  }
+
+  function addGalaxyRow(index, x, y, z) {
+    const table = document.getElementById('editableTable');
+    if (!table) return;
+    let tbody = table.querySelector('tbody');
+    if (!tbody) {
+      tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+    }
+    const tr = document.createElement('tr');
+    const makeCell = (text) => {
+      const td = document.createElement('td');
+      td.contentEditable = 'true';
+      td.textContent = text;
+      return td;
+    };
+    tr.appendChild(makeCell(index)); // i
+    tr.appendChild(makeCell(x.toFixed(2)));
+    tr.appendChild(makeCell(y.toFixed(2)));
+   
+    // порожні m,E,PA,BG
+    tr.appendChild(makeCell(7));
+    tr.appendChild(makeCell(0));
+    tr.appendChild(makeCell(0));
+    tr.appendChild(makeCell(0));
+     tr.appendChild(makeCell(z.toFixed(2)));
+    tbody.appendChild(tr);
+  }
+
+  function generateCluster() {
+    ensureTableHeader();
+    const n = parseInt(document.getElementById('clusterCount').value,10);
+    const sigma = parseFloat(document.getElementById('sigma').value);
+    if (isNaN(n) || n < 1) { alert('Невірна кількість'); return; }
+    if (isNaN(sigma) || sigma <= 0) { alert('Невірний σ'); return; }
+
+    // Очистити попереднє
+    const table = document.getElementById('editableTable');
+    let tbody = table.querySelector('tbody');
+    if (tbody) tbody.remove();
+    tbody = document.createElement('tbody');
+    table.appendChild(tbody);
+
+    for (let i = 0; i < n; i++) {
+      const x = randNormal(0, sigma);
+      const y = randNormal(0, sigma);
+      const z = randNormal(0, sigma);
+      addGalaxyRow(i+1, x, y, z);
+    }
+    hideModal();
+    // тут можна викликати оновлення візуалізації: drawEllipses() або іншу
+    if (typeof drawEllipses === 'function') {
+      drawEllipses();
+  
+    }
+        document.getElementById('refreshBtn').click();
+  }
+
+  document.getElementById('generateClusterBtn').addEventListener('click', generateCluster);
+
+
+  function exportTableToTxt(filename = 'galaxies.txt') {
+  const table = document.getElementById('editableTable');
+  if (!table) {
+    alert('Таблиця не знайдена');
+    return;
+  }
+
+  const lines = [];
+
+  // Беремо усі рядки <tr>, ігноруємо перший (заголовок)
+  const allRows = Array.from(table.querySelectorAll('tr'));
+  if (allRows.length <= 1) {
+    alert('Немає даних для експорту');
+    return;
+  }
+
+  // Проходимо по рядках, починаючи з другого
+  allRows.slice(1).forEach(row => {
+    const cells = Array.from(row.querySelectorAll('td'));
+    if (cells.length <= 1) return; // нема чого писати після відсікання першого стовпця
+    // Пропускаємо перший стовпець (cells[0])
+    const values = cells.slice(1).map(c => c.textContent.trim());
+    lines.push(values.join('\t'));
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('saveTxtBtn').addEventListener('click', () => {
+  exportTableToTxt('cluster_cartography.txt');
 });
    </script>
   </body>
