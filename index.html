@@ -470,12 +470,23 @@
         z-index: 10;
       }
 
-      #refreshBtn, #btn_generateCluster {
+      #refreshBtn, #btn_generateCluster, #G2DP-btn {
         cursor: pointer;
         padding: 4px 8px;
         border-radius: 4px;
         background: #ff9d00;
         
+      }
+      #G2DP-btn {
+        color: white;
+                padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      #G2DP-btn:hover{
+        color: black;
       }
 
       #clusterModal { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:1000; }
@@ -732,7 +743,10 @@ background: var(--accent-color)
           viewBox="0 0 575 545"
           preserveAspectRatio="xMidYMid meet"
         ></svg>
+        <button id="G2DP-btn" onclick="log2D()">Get 2D Positions</button>
             <div id="plot3d"></div>
+            
+
     <div id="info" class="highlight-info" style="display: none"></div>
     <div id="controls">
       <label>
@@ -4893,7 +4907,7 @@ cells[7].textContent = Math.round(z);
     }
   },
   margin: { l:0, r:0, b:0, t:0 },
-  hovermode: 'closest'
+  hovermode: 'closest',
 };
 
         const plot = document.getElementById("plot3d");
@@ -5122,6 +5136,120 @@ cells[7].textContent = Math.round(z);
 document.getElementById('saveTxtBtn').addEventListener('click', () => {
   exportTableToTxt('cluster_cartography.txt');
 });
+
+
+// Relocate coordinate data from 3d to 2d
+
+
+      function normalize(v) {
+        const length = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+        return { x: v.x / length, y: v.y / length, z: v.z / length };
+      }
+
+      function cross(a, b) {
+        return {
+          x: a.y * b.z - a.z * b.y,
+          y: a.z * b.x - a.x * b.z,
+          z: a.x * b.y - a.y * b.x,
+        };
+      }
+
+      function dot(a, b) {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+      }
+
+      function subtract(a, b) {
+        return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+      }
+
+      function projectPointToCamera(point, camera) {
+        const eye = camera.eye;
+        const center = camera.center;
+        const upVec = camera.up;
+
+        // 1. Forward = center - eye
+        const forward = normalize(subtract(center, eye));
+
+        // 2. Right = forward × up
+        const right = normalize(cross(forward, upVec));
+
+        // 3. Recomputed up = right × forward
+        const up = normalize(cross(right, forward));
+
+        // 4. Vector from eye to point
+        const p = subtract(point, eye);
+
+        // 5. Project to camera axes
+        const x = dot(p, right);
+        const y = dot(p, up);
+        const z = dot(p, forward); // Depth
+
+        return { x, y, z };
+      }
+
+      function getAllProjectedPoints(gd) {
+        const sceneKey = Object.keys(gd._fullLayout).find((k) =>
+          k.startsWith("scene")
+        );
+        const camera = gd._fullLayout[sceneKey].camera;
+
+        const projected = [];
+
+        gd.data.forEach((trace, tIndex) => {
+          if (trace.type !== "scatter3d") return;
+
+          for (let i = 0; i < trace.x.length; i++) {
+            const point = {
+              x: trace.x[i],
+              y: trace.y[i],
+              z: trace.z[i],
+            };
+
+            const proj = projectPointToCamera(point, camera);
+
+            projected.push({
+              index: i,
+              trace: tIndex,
+              data: point,
+              screen: proj, // x, y — координати у площині камери
+            });
+          }
+        });
+
+        return projected;
+      }
+      function log2D() {
+        const gd = document.getElementById("plot3d");
+        const projected = getAllProjectedPoints(gd);
+
+        console.log("Projected points onto camera plane:");
+        var kol=0;
+        console.table(
+          projected.map((p) => ({
+            i: p.index,
+            x: p.screen.x.toFixed(2),
+            y: p.screen.y.toFixed(2),
+            z: p.screen.z.toFixed(2),
+          }
+          ))
+        );
+       // export2DToTxt();
+        var tableBody = document.querySelector("#editableTable tbody");
+        tableBody.innerHTML = ""; // Clear existing table
+
+projected.forEach(p => {
+  const i = p.index;
+  const x = parseFloat(p.screen.x.toFixed(2));
+  const y = parseFloat(p.screen.y.toFixed(2));
+  const z = parseFloat(p.screen.z.toFixed(2));
+
+  addGalaxyRow(i+1, x, y, z);
+});
+     drawEllipses();   
+      }
+  
+
+
    </script>
   </body>
 </html>
